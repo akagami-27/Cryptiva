@@ -20,6 +20,12 @@ const ShareLink = require('../models/shareLink');
 
 const supabase = require('../config/supabase');
 const { createShareUrl } = require('../services/shareUrlService');
+const {
+    RESERVATION_LEASE_MS,
+    reserveDownloadSlot,
+    renewReservationOrAbort,
+    settleDownloadReservation
+} = require('../services/shareDownloadReservations');
 
 const {
     validateUploadedFile
@@ -121,6 +127,44 @@ const upload = multer({
     }
 
 });
+
+const uploadFiles = upload.array('files', MAX_FILES_PER_UPLOAD);
+
+function handleUploadFiles(req, res, next) {
+    uploadFiles(req, res, async (error) => {
+        if (!error) {
+            return next();
+        }
+
+        for (const file of req.files || []) {
+            try {
+                await cleanupTempFile(file.path);
+            } catch (cleanupError) {
+                console.error(
+                    'Failed to clean temporary upload file:',
+                    cleanupError.message
+                );
+            }
+        }
+
+        const tooLarge =
+            error instanceof multer.MulterError &&
+            error.code === 'LIMIT_FILE_SIZE';
+
+        if (error instanceof multer.MulterError) {
+            return res.status(tooLarge ? 413 : 400).json({
+                error: tooLarge
+                    ? 'The uploaded file exceeds the allowed size.'
+                    : 'The upload could not be processed.'
+            });
+        }
+
+        console.error('Upload middleware failed:', error);
+        return res.status(500).json({
+            error: 'File upload failed. Please try again.'
+        });
+    });
+}
 
 
 /*
@@ -355,14 +399,13 @@ function encryptShareToken(
 router.post(
     '/upload',
     requireAuth,
-    upload.array(
-        'files',
-        MAX_FILES_PER_UPLOAD
-    ),
+    handleUploadFiles,
     async (req, res) => {
 
         const temporaryFiles =
             req.files || [];
+        const uploadedFiles = [];
+        const createdFiles = [];
 
         try {
 
@@ -385,17 +428,24 @@ router.post(
                 );
 
             if (!user) {
+                for (const file of temporaryFiles) {
+                    await cleanupTempFile(file.path);
+                }
 
-                return res
-                    .status(401)
-                    .json({
-                        error:
-                            'Authenticated user not found.'
-                    });
-
+                return res.status(401).json({
+                    error: 'Authenticated user not found.'
+                });
             }
+            
+            if (user.status !== 'active') {
+                for (const file of temporaryFiles) {
+                    await cleanupTempFile(file.path);
+                }
 
-            const uploadedFiles = [];
+                return res.status(403).json({
+                    error: 'This account is disabled.'
+                });
+            }
 
             for (
                 const uploadedFile
@@ -404,8 +454,6 @@ router.post(
 
                 const tempPath =
                     uploadedFile.path;
-
-                try {
 
                     const validation =
                         await validateUploadedFile(
@@ -438,29 +486,37 @@ router.post(
 
                     }
 
-                    const plaintext =
-                        await fs.readFile(
-                            tempPath
-                        );
+                    let plaintext = null;
+                    let dataEncryptionKey = null;
 
-                    const sha256 =
-                        calculateSha256(
-                            plaintext
-                        );
+                    let sha256;
+                    let encrypted;
+                    let wrapped;
 
-                    const dataEncryptionKey =
-                        generateDataEncryptionKey();
+                    try {
+                        plaintext = await fs.readFile(tempPath);
 
-                    const encrypted =
-                        encryptData(
+                        sha256 = calculateSha256(plaintext);
+
+                        dataEncryptionKey = generateDataEncryptionKey();
+
+                        encrypted = encryptData(
                             plaintext,
                             dataEncryptionKey
                         );
 
-                    const wrapped =
-                        wrapDataEncryptionKey(
+                        wrapped = wrapDataEncryptionKey(
                             dataEncryptionKey
                         );
+                    } finally {
+                        if (plaintext) {
+                            plaintext.fill(0);
+                        }
+
+                        if (dataEncryptionKey) {
+                            dataEncryptionKey.fill(0);
+                        }
+                    }
 
                     const actualFileId =
                         new mongoose.Types.ObjectId()
@@ -471,29 +527,6 @@ router.post(
                             user._id.toString(),
                             actualFileId
                         );
-
-                    const {
-                        error: uploadError
-                    } = await supabase
-                        .storage
-                        .from(SUPABASE_BUCKET)
-                        .upload(
-                            storagePath,
-                            encrypted.ciphertext,
-                            {
-                                contentType:
-                                    'application/octet-stream',
-                                upsert: false
-                            }
-                        );
-
-                    if (uploadError) {
-
-                        throw new Error(
-                            `Supabase upload failed: ${uploadError.message}`
-                        );
-
-                    }
 
                     let fileDocument;
 
@@ -566,30 +599,33 @@ router.post(
                                     verified:
                                         true
 
-                                }
+                                },
+
+                                lifecycle: 'uploading'
 
                             });
 
                     } catch (databaseError) {
-
-                        try {
-
-                            await deleteSupabaseObject(
-                                storagePath
-                            );
-
-                        } catch (cleanupError) {
-
-                            console.error(
-                                'Failed to clean orphaned Supabase object:',
-                                cleanupError.message
-                            );
-
-                        }
-
                         throw databaseError;
 
                     }
+
+                    createdFiles.push(fileDocument);
+
+                    const { error: uploadError } = await supabase
+                        .storage
+                        .from(SUPABASE_BUCKET)
+                        .upload(storagePath, encrypted.ciphertext, {
+                            contentType: 'application/octet-stream',
+                            upsert: false
+                        });
+
+                    if (uploadError) {
+                        throw new Error(`Supabase upload failed: ${uploadError.message}`);
+                    }
+
+                    fileDocument.lifecycle = 'active';
+                    await fileDocument.save();
 
                     uploadedFiles.push({
 
@@ -616,23 +652,21 @@ router.post(
 
                     });
 
-                    await logFileUpload(
-                        req,
-                        fileDocument
-                    );
-
-                    plaintext.fill(0);
-
-                    dataEncryptionKey.fill(0);
-
-                } finally {
-
-                    await cleanupTempFile(
-                        tempPath
-                    );
-
                 }
 
+            for (const fileDocument of createdFiles) {
+                try {
+                    await logFileUpload(req, fileDocument);
+                } catch (auditError) {
+                    console.error(
+                        'File was uploaded, but its audit log could not be saved:',
+                        {
+                            fileId: fileDocument._id.toString(),
+                            userId: user._id.toString(),
+                            error: auditError.message
+                        }
+                    );
+                }
             }
 
             return res.json({
@@ -646,33 +680,81 @@ router.post(
             });
 
         } catch (error) {
+            console.error('File upload failed:', error);
 
-            console.error(
-                'File upload failed:',
-                error.message
-            );
-
-            for (
-                const file
-                of temporaryFiles
-            ) {
-
-                await cleanupTempFile(
-                    file.path
-                );
-
+            const rollbackFailures = [];
+            for (const fileDocument of createdFiles.reverse()) {
+                try {
+                    await deleteSupabaseObject(fileDocument.storagePath);
+                    await ShareLink.deleteMany({
+                        fileId: fileDocument._id,
+                        ownerId: fileDocument.ownerId
+                    });
+                    await File.deleteOne({
+                        _id: fileDocument._id,
+                        ownerId: fileDocument.ownerId
+                    });
+                } catch (rollbackError) {
+                    rollbackFailures.push(fileDocument._id.toString());
+                    await File.updateOne(
+                        { _id: fileDocument._id, ownerId: fileDocument.ownerId },
+                        { $set: { lifecycle: 'delete_failed', lifecycleError: String(rollbackError.message).slice(0, 500) } }
+                    ).catch((statusError) => console.error('Could not persist upload rollback failure:', statusError.message));
+                    console.error(
+                        'Failed to roll back a partial multi-file upload:',
+                        {
+                            fileId: fileDocument._id.toString(),
+                            error: rollbackError.message
+                        }
+                    );
+                }
             }
 
-            return res
-                .status(400)
-                .json({
+            for (const file of temporaryFiles) {
+                try {
+                    await cleanupTempFile(file.path);
+                } catch (cleanupError) {
+                    console.error(
+                        'Failed to clean temporary upload file:',
+                        cleanupError.message
+                    );
+                }
+            }
 
-                    error:
-                        error.message ||
-                        'File upload failed.'
+            const message = String(error?.message || '');
 
-                });
+            let statusCode = 500;
+            let publicMessage = 'File upload failed. Please try again.';
 
+            if (
+                message === 'No files received.' ||
+                message.includes('File rejected because malware was detected.')
+            ) {
+                statusCode = 400;
+                publicMessage =
+                    message === 'No files received.'
+                        ? 'No files received.'
+                        : 'The uploaded file was rejected by the security scanner.';
+            } else if (message.includes('Malware scanner failed.')) {
+                statusCode = 503;
+                publicMessage =
+                    'File security scanning is temporarily unavailable. Please try again later.';
+            } else if (
+                message.toLowerCase().includes('file too large') ||
+                message.toLowerCase().includes('file size')
+            ) {
+                statusCode = 413;
+                publicMessage = 'The uploaded file exceeds the allowed size.';
+            }
+
+            return res.status(statusCode).json({
+                error: rollbackFailures.length
+                    ? 'The upload failed and some files could not be rolled back. Refresh your file list and contact support if they remain.'
+                    : publicMessage,
+                ...(rollbackFailures.length
+                    ? { partial: true, fileIds: rollbackFailures }
+                    : {})
+            });
         }
 
     }
@@ -700,15 +782,17 @@ router.get(
                     req
                 );
 
+            
             if (!user) {
+                return res.status(401).json({
+                    error: 'Authenticated user not found.'
+                });
+            }
 
-                return res
-                    .status(401)
-                    .json({
-                        error:
-                            'Authenticated user not found.'
-                    });
-
+            if (user.status !== 'active') {
+                return res.status(403).json({
+                    error: 'This account is disabled.'
+                });
             }
 
             if (
@@ -733,7 +817,9 @@ router.get(
                         req.params.id,
 
                     ownerId:
-                        user._id
+                        user._id,
+
+                    lifecycle: { $in: ['active', null] }
 
                 });
 
@@ -798,10 +884,17 @@ router.get(
                     plaintext
                 );
 
-            if (
-                calculatedSha256.toLowerCase() !==
-                file.integrity.sha256.toLowerCase()
-            ) {
+                const storedSha256 = file.integrity?.sha256;
+                if (!/^[a-f0-9]{64}$/i.test(String(storedSha256 || ''))) {
+                    return res.status(500).json({
+                        error: 'File integrity metadata is unavailable; download blocked.'
+                    });
+                }
+
+                if (
+                    calculatedSha256.toLowerCase() !==
+                    storedSha256.toLowerCase()
+                ) {
 
                 return res
                     .status(500)
@@ -846,10 +939,14 @@ router.get(
             |
             */
 
-            await logFileDownload(
-                req,
-                file
-            );
+            // Ordinary download logging is best effort. Delivery must not fail
+            // because the audit collection is temporarily unavailable.
+            void logFileDownload(req, file).catch((auditError) => {
+                console.error('File download audit log failed:', {
+                    fileId: file._id.toString(),
+                    error: auditError.message
+                });
+            });
 
             return res.send(
                 plaintext
@@ -911,20 +1008,19 @@ router.post(
 
         try {
 
-            const user =
-                await getAuthenticatedUser(req);
+        const user = await getAuthenticatedUser(req);
 
+        if (!user) {
+            return res.status(401).json({
+                error: 'Authenticated user not found.'
+            });
+        }
 
-            if (!user) {
-
-                return res
-                    .status(401)
-                    .json({
-                        error:
-                            'Authenticated user not found.'
-                    });
-
-            }
+        if (user.status !== 'active') {
+            return res.status(403).json({
+                error: 'This account is disabled.'
+            });
+        }
 
 
             /*
@@ -961,7 +1057,8 @@ router.post(
                         req.params.id,
 
                     ownerId:
-                        user._id
+                        user._id,
+                    lifecycle: { $in: ['active', null] }
                 });
 
 
@@ -1263,37 +1360,6 @@ router.post(
 
             if (existingShare) {
 
-                const passwordHash =
-                    await bcrypt.hash(
-                        password,
-                        12
-                    );
-
-
-                existingShare.passwordHash =
-                    passwordHash;
-
-
-                existingShare.expiresAt =
-                    expiresAt;
-
-
-                existingShare.maxDownloads =
-                    maxDownloads;
-
-
-                existingShare.revokedAt =
-                    null;
-
-
-                await existingShare.save();
-                
-                await logShareUpdated(
-                    req,
-                    existingShare,
-                    file
-                );
-
                 /*
                 |--------------------------------------------------------------------------
                 | Recover existing token
@@ -1401,6 +1467,26 @@ router.post(
 
                 const shareUrl =
                     createShareUrl(rawToken);
+
+                // Validate token recovery before changing any persisted share settings.
+                const passwordHash = await bcrypt.hash(password, 12);
+                existingShare.passwordHash = passwordHash;
+                existingShare.expiresAt = expiresAt;
+                existingShare.maxDownloads = maxDownloads;
+                existingShare.revokedAt = null;
+                await existingShare.save();
+
+                try {
+                    const auditResult = await logShareUpdated(req, existingShare, file);
+                    if (!auditResult) {
+                        console.error('Share settings updated but audit logging failed:', {
+                            shareId: existingShare._id.toString(),
+                            fileId: file._id.toString()
+                        });
+                    }
+                } catch (auditError) {
+                    console.error('Share settings updated but audit logging failed:', auditError.message);
+                }
 
 
                 return res
@@ -1575,11 +1661,19 @@ router.post(
 
                 });
             
-            await logShareCreated(
-                req,
-                shareLink,
-                file
-            );
+            try {
+                await logShareCreated(req, shareLink, file);
+            } catch (auditError) {
+                console.error(
+                    'Share link was created, but its audit log could not be saved:',
+                    {
+                        shareId: shareLink._id.toString(),
+                        fileId: file._id.toString(),
+                        userId: user._id.toString(),
+                        error: auditError.message
+                    }
+                );
+            }
 
 
             /*
@@ -1777,6 +1871,20 @@ router.get(
                 );
             }
 
+            const user = await getAuthenticatedUser(req);
+
+            if (!user) {
+                return res.status(401).send(
+                    'Authenticated user not found.'
+                );
+            }
+
+            if (user.status !== 'active') {
+                return res.status(403).send(
+                    'This account is disabled.'
+                );
+            }
+
             const rawToken =
                 String(
                     req.params.token || ''
@@ -1897,7 +2005,8 @@ router.get(
                     _id:
                         shareLink.fileId,
                     ownerId:
-                        shareLink.ownerId
+                        shareLink.ownerId,
+                    lifecycle: { $in: ['active', null] }
                 });
 
             if (!file) {
@@ -1995,10 +2104,23 @@ router.post(
     requireAuth,
     async (req, res) => {
         try {
-            const rawToken =
-                String(
-                    req.params.token || ''
-                );
+            // Verify the authenticated user's current database account status.
+            const user = await getAuthenticatedUser(req);
+
+            if (!user) {
+                return res.status(401).json({
+                    error: 'Authenticated user not found.'
+                });
+            }
+
+            if (user.status !== 'active') {
+                return res.status(403).json({
+                    error: 'This account is disabled.'
+                });
+            }
+
+            // Continue with the existing code here.
+            const rawToken = String(req.params.token || '');
 
             /*
              * Validate token format.
@@ -2105,7 +2227,8 @@ router.post(
                     _id:
                         shareLink.fileId,
                     ownerId:
-                        shareLink.ownerId
+                        shareLink.ownerId,
+                    lifecycle: { $in: ['active', null] }
                 });
 
             if (!file) {
@@ -2203,7 +2326,9 @@ router.post(
              * Proceed with secure download.
              */
             req.session.sharePasswordVerified = {
-                token: req.params.token,
+                tokenHash: shareLink.tokenHash,
+                shareId: shareLink._id.toString(),
+                passwordHash: shareLink.passwordHash,
                 expiresAt: Date.now() + 5 * 60 * 1000
             };
 
@@ -2747,7 +2872,7 @@ function renderPublicShareIntegrityPage({
         <div class="status">
 
             <div class="check">
-                ✓
+                âœ“
             </div>
 
             <div>
@@ -2873,8 +2998,8 @@ function renderPublicShareIntegrityPage({
 
     } finally {
 
-        plaintext = null;
-        dataEncryptionKey = null;
+        if (plaintext) plaintext.fill(0);
+        if (dataEncryptionKey) dataEncryptionKey.fill(0);
 
     }
 }
@@ -2893,14 +3018,24 @@ function renderPublicShareIntegrityPage({
 router.post(
     '/shared/:token/download',
     requireAuth,
-        async (req, res) => {
-
+    async (req, res) => {
         try {
+            const user = await getAuthenticatedUser(req);
 
-            const rawToken =
-                String(
-                    req.params.token || ''
-                );
+            if (!user) {
+                return res.status(401).json({
+                    error: 'Authenticated user not found.'
+                });
+            }
+
+            if (user.status !== 'active') {
+                return res.status(403).json({
+                    error: 'This account is disabled.'
+                });
+            }
+
+            // Continue with the existing token validation here.
+            const rawToken = String(req.params.token || '');
 
 
             if (
@@ -2951,7 +3086,9 @@ router.post(
             if (
                 shareLink.passwordHash &&
                 (!verified ||
-                    verified.token !== req.params.token ||
+                    verified.tokenHash !== shareLink.tokenHash ||
+                    verified.shareId !== shareLink._id.toString() ||
+                    verified.passwordHash !== shareLink.passwordHash ||
                     verified.expiresAt < Date.now())
             ) {
                 return res.status(403).send(
@@ -3028,7 +3165,8 @@ router.post(
                         shareLink.fileId,
 
                     ownerId:
-                        shareLink.ownerId
+                        shareLink.ownerId,
+                    lifecycle: { $in: ['active', null] }
                 });
 
 
@@ -3146,8 +3284,8 @@ router.post(
 
             } finally {
 
-                plaintext = null;
-                dataEncryptionKey = null;
+                if (plaintext) plaintext.fill(0);
+                if (dataEncryptionKey) dataEncryptionKey.fill(0);
 
             }
 
@@ -3298,155 +3436,134 @@ async function downloadPublicSharedFile(
             );
 
         if (
+            !/^[a-f0-9]{64}$/i.test(String(file.integrity?.sha256 || ''))
+        ) {
+            return res.status(500).send(
+                renderPublicSharePage({
+                    title: 'Integrity verification unavailable',
+                    message: 'The file has no valid integrity record and cannot be downloaded.',
+                    showForm: false
+                })
+            );
+        }
+
+        if (
             calculatedSha256.toLowerCase() !==
             file.integrity.sha256.toLowerCase()
         ) {
             return res.status(500).send(
                 renderPublicSharePage({
-                    title:
-                        'Integrity verification failed',
-                    message:
-                        'The file failed integrity verification and cannot be downloaded.',
+                    title: 'Integrity verification failed',
+                    message: 'The file failed integrity verification and cannot be downloaded.',
                     showForm: false
                 })
             );
         }
 
-        /*
-         * Atomically increment download count.
-         *
-         * This prevents concurrent downloads from
-         * exceeding the configured limit.
-         */
-        const downloadFilter = {
-            _id:
-                shareLink._id,
+        // Reserve a slot atomically before sending. A completed response counts;
+        // a disconnected/failed response releases its reservation.
+        const reservationId = await reserveDownloadSlot(
+            ShareLink,
+            shareLink._id
+        );
 
-            downloadCount:
-                shareLink.downloadCount
-        };
-
-        if (
-            shareLink.maxDownloads !== null
-        ) {
-            downloadFilter.maxDownloads = {
-                $gte:
-                    shareLink.downloadCount + 1
-            };
-        }
-
-        const updatedShareLink =
-            await ShareLink.findOneAndUpdate(
-                downloadFilter,
-
-                {
-                    $inc: {
-                        downloadCount: 1
-                    }
-                },
-
-                {
-                    new: true
-                }
-            );
-
-        if (!updatedShareLink) {
+        if (!reservationId) {
             return res.status(410).send(
                 renderPublicSharePage({
-                    title:
-                        'Download limit reached',
-                    message:
-                        'This share link has reached its download limit.',
+                    title: 'Download limit reached',
+                    message: 'This share link has reached its download limit.',
                     showForm: false
                 })
             );
         }
 
-        await logShareDownload(
-            req,
-            updatedShareLink,
-            file
-        );
-
-        /*
-         * Prevent caching of sensitive file data.
-         */
-        res.setHeader(
-            'Cache-Control',
-            'no-store'
-        );
-
-        res.setHeader(
-            'Pragma',
-            'no-cache'
-        );
-
-        res.setHeader(
-            'Referrer-Policy',
-            'no-referrer'
-        );
-
-        /*
-         * File MIME type.
-         */
-        res.setHeader(
-            'Content-Type',
-            file.mimeType
-        );
-
-        /*
-         * File size.
-         */
-        res.setHeader(
-            'Content-Length',
-            plaintext.length
-        );
-
-        /*
-         * Safe UTF-8 filename.
-         */
-        const encodedFilename =
-            encodeURIComponent(
-                file.originalName
-            );
-
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Referrer-Policy', 'no-referrer');
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Length', plaintext.length);
+        const encodedFilename = encodeURIComponent(file.originalName);
         res.setHeader(
             'Content-Disposition',
             `attachment; filename*=UTF-8''${encodedFilename}`
         );
 
-        return res.send(
-            plaintext
-        );
-
+        // Keep the response buffer intact until Node finishes writing it.
+        const responseBody = Buffer.from(plaintext);
+        const clearResponseBody = () => {
+            responseBody.fill(0);
+            res.off('finish', clearResponseBody);
+            res.off('close', clearResponseBody);
+        };
+        let settled = false;
+        let renewalInProgress = false;
+        const heartbeat = setInterval(() => {
+            if (settled || renewalInProgress) return;
+            renewalInProgress = true;
+            void renewReservationOrAbort(
+                ShareLink,
+                shareLink._id,
+                reservationId,
+                res,
+                settle
+            ).finally(() => {
+                renewalInProgress = false;
+            });
+        }, Math.floor(RESERVATION_LEASE_MS / 3));
+        heartbeat.unref?.();
+        const settle = async (completed) => {
+            if (settled) return;
+            settled = true;
+            clearInterval(heartbeat);
+            try {
+                const settledReservation = await settleDownloadReservation(
+                    ShareLink,
+                    shareLink._id,
+                    reservationId,
+                    completed
+                );
+                if (completed && !settledReservation) {
+                    console.warn('Completed shared response had an expired reservation:', {
+                        shareId: shareLink._id.toString(),
+                        reservationId
+                    });
+                }
+            } catch (counterError) {
+                console.error('Could not finalize shared download reservation:', {
+                    shareId: shareLink._id.toString(),
+                    completed,
+                    error: counterError.message
+                });
+            }
+            if (completed) {
+                void logShareDownload(req, shareLink, file).catch((auditError) => {
+                    console.error('Shared download audit log failed:', {
+                        shareId: shareLink._id.toString(),
+                        fileId: file._id.toString(),
+                        error: auditError.message
+                    });
+                });
+            }
+        };
+        res.once('finish', clearResponseBody);
+        res.once('close', clearResponseBody);
+        res.once('finish', () => { void settle(true); });
+        res.once('close', () => { if (!res.writableFinished) void settle(false); });
+        return res.send(responseBody);
     } catch (error) {
-        console.error(
-            'Public shared file download failed:',
-            error.message
-        );
-
+        console.error('Public shared file download failed:', error.message);
         return res.status(500).send(
             renderPublicSharePage({
-                title:
-                    'Download failed',
-                message:
-                    'Unable to download the shared file.',
+                title: 'Download failed',
+                message: 'Unable to download the shared file.',
                 showForm: false
             })
         );
-
     } finally {
-        if (plaintext) {
-            plaintext.fill(0);
-        }
-
-        if (dataEncryptionKey) {
-            dataEncryptionKey.fill(0);
-        }
+        if (plaintext) plaintext.fill(0);
+        if (dataEncryptionKey) dataEncryptionKey.fill(0);
     }
 }
-
-
 /*
 |--------------------------------------------------------------------------
 | PUBLIC SHARE HTML PAGE
@@ -4402,7 +4519,7 @@ function renderPublicSharePage({
     </main>
 
     <footer class="footer">
-        Secured by <strong>Cryptiva</strong> · Private encrypted file sharing
+        Secured by <strong>Cryptiva</strong> Â· Private encrypted file sharing
     </footer>
 
     <script>
@@ -4487,15 +4604,18 @@ router.delete(
                     req
                 );
 
+            
+            
             if (!user) {
+                return res.status(401).json({
+                    error: 'Authenticated user not found.'
+                });
+            }
 
-                return res
-                    .status(401)
-                    .json({
-                        error:
-                            'Authenticated user not found.'
-                    });
-
+            if (user.status !== 'active') {
+                return res.status(403).json({
+                    error: 'This account is disabled.'
+                });
             }
 
             if (
@@ -4535,34 +4655,34 @@ router.delete(
 
             }
 
-            await ShareLink.deleteMany({
-
-                fileId:
-                    file._id,
-
-                ownerId:
-                    user._id
-
-            });
-
-            await deleteSupabaseObject(
-                file.storagePath
-            );
-
-            await File.deleteOne({
-
-                _id:
-                    file._id,
-
-                ownerId:
-                    user._id
-
-            });
-
-            await logFileDelete(
-                 req,
-                 file
-            );
+            // Mark first so downloads and shares can reject this file while
+            // deletion is in progress. A retry resumes the idempotent workflow.
+            file.lifecycle = 'deleting';
+            file.lifecycleError = null;
+            await file.save();
+            try {
+                await deleteSupabaseObject(file.storagePath);
+                await ShareLink.deleteMany({ fileId: file._id, ownerId: user._id });
+                await File.deleteOne({ _id: file._id, ownerId: user._id });
+            } catch (cleanupError) {
+                await File.updateOne(
+                    { _id: file._id, ownerId: user._id },
+                    { $set: { lifecycle: 'delete_failed', lifecycleError: String(cleanupError.message).slice(0, 500) } }
+                ).catch((statusError) => console.error('Could not persist deletion failure state:', statusError.message));
+                throw cleanupError;
+            }
+            try {
+                const auditResult = await logFileDelete(req, file);
+                if (!auditResult) {
+                    console.error('File deleted, but deletion audit logging failed:', {
+                        fileId: file._id.toString(),
+                        userId: user._id.toString()
+                    });
+                }
+            } catch (auditError) {
+                // Cleanup already succeeded; an audit outage must not report a false deletion failure.
+                console.error('File deleted, but deletion audit logging failed:', auditError.message);
+            }
 
             return res.json({
 
@@ -4602,35 +4722,35 @@ router.get(
     '/data',
     requireAuth,
     async (req, res) => {
-
         try {
-
             const user = await getAuthenticatedUser(req);
 
             if (!user) {
-
                 return res.status(401).json({
-                    error: 'Authentication required.'
+                    error: 'Authenticated user not found.'
                 });
-
             }
 
             if (user.status !== 'active') {
-
                 return res.status(403).json({
                     error: 'This account is disabled.'
                 });
-
             }
 
             const files = await File
                 .find({
-                    ownerId: user._id
+                    ownerId: user._id,
+                    lifecycle: { $in: ['active', null] }
                 })
                 .sort({
                     createdAt: -1
                 })
                 .lean();
+
+            const cleanupRequired = await File.find({
+                ownerId: user._id,
+                lifecycle: { $in: ['uploading', 'deleting', 'delete_failed'] }
+            }).select('_id lifecycle').lean();
 
             const fileData = files.map(
                 (file) => {
@@ -4708,7 +4828,12 @@ router.get(
                 sharedCount,
 
                 files:
-                    fileData
+                    fileData,
+
+                cleanupRequired: cleanupRequired.map((file) => ({
+                    id: String(file._id),
+                    status: file.lifecycle
+                }))
 
             });
 
@@ -4739,3 +4864,7 @@ router.get(
 */
 
 module.exports = router;
+
+
+
+

@@ -22,6 +22,19 @@ const fileSchema = new mongoose.Schema(
       unique: true
     },
 
+    lifecycle: {
+      type: String,
+      enum: ['uploading', 'active', 'deleting', 'delete_failed'],
+      default: 'active',
+      index: true
+    },
+
+    lifecycleError: {
+      type: String,
+      default: null,
+      maxlength: 500
+    },
+
     size: {
       type: Number,
       required: true,

@@ -88,6 +88,23 @@ const shareLinkSchema = new mongoose.Schema(
             min: 0
         },
 
+        // Reservations prevent concurrent responses exceeding maxDownloads.
+        activeDownloads: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
+        // Individual expiring leases allow crashed workers to be reclaimed.
+        activeDownloadReservations: {
+            type: [{
+                _id: false,
+                id: { type: String, required: true },
+                expiresAt: { type: Date, required: true }
+            }],
+            default: []
+        },
+
         /*
          * Revocation timestamp.
          *

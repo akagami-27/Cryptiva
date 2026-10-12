@@ -3,9 +3,116 @@
 const {
     rateLimit
 } = require('express-rate-limit');
+const mongoose = require('mongoose');
+
+class MongoRateLimitStore {
+    constructor(namespace) {
+        this.namespace = namespace;
+        this.windowMs = 15 * 60 * 1000;
+        this.localKeys = false;
+        this.indexPromise = null;
+    }
+
+    init(options) {
+        this.windowMs = options.windowMs;
+    }
+
+    async collection() {
+        if (mongoose.connection.readyState !== 1) {
+            throw new Error('MongoDB is required for rate limiting.');
+        }
+        const collection = mongoose.connection.collection('rateLimitBuckets');
+        this.indexPromise ||= Promise.all([
+            collection.createIndex({ key: 1 }, { unique: true }),
+            collection.createIndex({ resetTime: 1 }, { expireAfterSeconds: 0 })
+        ]).catch((error) => {
+            this.indexPromise = null;
+            throw error;
+        });
+        await this.indexPromise;
+        return collection;
+    }
+
+    bucketKey(key) {
+        return `${this.namespace}:${key}`;
+    }
+
+    async increment(key) {
+        const collection = await this.collection();
+        const now = new Date();
+        const resetTime = new Date(now.getTime() + this.windowMs);
+        const updatePipeline = [{ $set: {
+                key: this.bucketKey(key),
+                totalHits: {
+                    $cond: [
+                        { $gt: ['$resetTime', now] },
+                        { $add: [{ $ifNull: ['$totalHits', 0] }, 1] },
+                        1
+                    ]
+                },
+                resetTime: {
+                    $cond: [
+                        { $gt: ['$resetTime', now] },
+                        '$resetTime',
+                        resetTime
+                    ]
+                }
+            } }];
+        let doc;
+        try {
+            doc = await collection.findOneAndUpdate(
+                { key: this.bucketKey(key) },
+                updatePipeline,
+                { upsert: true, returnDocument: 'after' }
+            );
+        } catch (error) {
+            // Concurrent first hits can race to insert the same unique key.
+            if (error.code !== 11000) throw error;
+            doc = await collection.findOneAndUpdate(
+                { key: this.bucketKey(key) },
+                updatePipeline,
+                { returnDocument: 'after' }
+            );
+        }
+        return { totalHits: doc.totalHits, resetTime: doc.resetTime };
+    }
+
+    async decrement(key) {
+        const collection = await this.collection();
+        await collection.updateOne(
+            { key: this.bucketKey(key) },
+            [{ $set: {
+                totalHits: { $max: [0, { $subtract: ['$totalHits', 1] }] }
+            } }]
+        );
+    }
+
+    async get(key) {
+        const collection = await this.collection();
+        const doc = await collection.findOne({
+            key: this.bucketKey(key),
+            resetTime: { $gt: new Date() }
+        });
+        return doc ? { totalHits: doc.totalHits, resetTime: doc.resetTime } : undefined;
+    }
+
+    async resetKey(key) {
+        const collection = await this.collection();
+        await collection.deleteOne({ key: this.bucketKey(key) });
+    }
+
+    async resetAll() {
+        const collection = await this.collection();
+        await collection.deleteMany({ key: new RegExp(`^${this.namespace}:`) });
+    }
+
+    shutdown() {}
+}
 
 
 const loginRateLimiter = rateLimit({
+
+    store: new MongoRateLimitStore('login'),
 
     windowMs: 15 * 60 * 1000,
 
@@ -203,6 +310,8 @@ const loginRateLimiter = rateLimit({
 
 const sharePasswordRateLimiter = rateLimit({
 
+    store: new MongoRateLimitStore('share-password'),
+
     windowMs: 15 * 60 * 1000,
 
     limit: 5,
@@ -352,6 +461,7 @@ const sharePasswordRateLimiter = rateLimit({
 
 
 module.exports = {
+    MongoRateLimitStore,
     loginRateLimiter,
     sharePasswordRateLimiter
 };
