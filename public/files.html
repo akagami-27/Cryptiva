@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="Cryptiva secure file vault"
+    >
+
+    <meta
+        name="robots"
+        content="noindex, nofollow, noarchive"
+    >
+
+    <meta
+        name="theme-color"
+        content="#05050d"
+    >
+
+    <title>My Files — Cryptiva</title>
+
+
+    <!-- =========================================================
+         STYLES
+         ========================================================= -->
+
+    <link
+        rel="stylesheet"
+        href="/css/style.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/css/sidebar.css?v=20261007-2000"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/css/files.css?v=20261007-2000"
+    >
+
+
+    <!-- =========================================================
+         CSRF
+         ========================================================= -->
+
+    <meta
+        name="csrf-token"
+        content="<%= csrfToken %>"
+    >
+
+</head>
+
+
+<body class="files-page">
+
+
+    <!-- =========================================================
+         MAIN APPLICATION
+         ========================================================= -->
+
+    <main class="files-shell">
+
+        <section class="files-content">
+
+
+            <!-- =================================================
+                 HEADER
+                 ================================================= -->
+
+            <header class="files-header">
+
+                <div class="files-header-copy">
+
+                    <div class="files-eyebrow">
+
+                        <span class="files-eyebrow-dot"></span>
+
+                        Secure vault
+
+                    </div>
+
+
+                    <h1>
+                        My Files
+                    </h1>
+
+
+                    <p>
+                        Manage your encrypted files and secure storage.
+                    </p>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="files-upload-button"
+                    id="files-upload-button"
+                >
+
+                    <span class="files-upload-button-icon">
+                        +
+                    </span>
+
+                    Upload files
+
+                </button>
+
+            </header>
+
+
+            <!-- =================================================
+                 STATISTICS
+                 ================================================= -->
+
+            <section class="files-stats">
+
+
+                <!-- Total Files -->
+
+                <article class="files-stat-card">
+
+                    <div class="files-stat-icon files-stat-icon-purple">
+
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden="true"
+                        >
+
+                            <path
+                                d="M4 7.5A2.5 2.5 0 0 1 6.5 5h3l2 2h6A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linejoin="round"
+                            />
+
+                        </svg>
+
+                    </div>
+
+
+                    <div>
+
+                        <div class="files-stat-label">
+                            Total files
+                        </div>
+
+                        <div
+                            class="files-stat-value"
+                            id="files-total"
+                        >
+                            —
+                        </div>
+
+                    </div>
+
+                </article>
+
+
+                <!-- Storage -->
+
+                <article class="files-stat-card">
+
+                    <div class="files-stat-icon files-stat-icon-blue">
+
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden="true"
+                        >
+
+                            <path
+                                d="M12 3v12"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                            />
+
+                            <path
+                                d="m7.5 10.5 4.5 4.5 4.5-4.5"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+
+                            <path
+                                d="M5 20h14"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                            />
+
+                        </svg>
+
+                    </div>
+
+
+                    <div>
+
+                        <div class="files-stat-label">
+                            Storage used
+                        </div>
+
+                        <div
+                            class="files-stat-value"
+                            id="files-storage"
+                        >
+                            —
+                        </div>
+
+                    </div>
+
+                </article>
+
+
+                <!-- Protection -->
+
+                <article class="files-stat-card">
+
+                    <div class="files-stat-icon files-stat-icon-green">
+
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden="true"
+                        >
+
+                            <path
+                                d="M12 3.5 19 6v5.4c0 4.5-2.8 7.6-7 9.1-4.2-1.5-7-4.6-7-9.1V6l7-2.5Z"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linejoin="round"
+                            />
+
+                            <path
+                                d="m9.5 12.1 1.7 1.9 3.6-4"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+
+                        </svg>
+
+                    </div>
+
+
+                    <div>
+
+                        <div class="files-stat-label">
+                            Protected
+                        </div>
+
+                        <div
+                            class="files-stat-value"
+                            id="files-protected"
+                        >
+                            100%
+                        </div>
+
+                    </div>
+
+                </article>
+
+
+            </section>
+
+
+            <!-- =================================================
+                 TOOLBAR
+                 ================================================= -->
+
+            <section class="files-toolbar">
+
+                <div class="files-toolbar-title">
+
+                    <h2>
+                        Your files
+                    </h2>
+
+                    <span
+                        class="files-count"
+                        id="files-count"
+                    >
+                        0 files
+                    </span>
+
+                </div>
+
+
+                <div class="files-toolbar-actions">
+
+
+                    <!-- Search -->
+
+                    <div class="files-search">
+
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden="true"
+                        >
+
+                            <circle
+                                cx="11"
+                                cy="11"
+                                r="6.5"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                            />
+
+                            <path
+                                d="m16 16 4 4"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                            />
+
+                        </svg>
+
+
+                        <input
+                            type="search"
+                            id="files-search"
+                            placeholder="Search files..."
+                            autocomplete="off"
+                            spellcheck="false"
+                            aria-label="Search files"
+                        >
+
+                    </div>
+
+
+                    <!-- Filter -->
+
+                    <select
+                        id="files-filter"
+                        class="files-filter"
+                        aria-label="Filter files"
+                    >
+
+                        <option value="all">
+                            All files
+                        </option>
+
+                        <option value="document">
+                            Documents
+                        </option>
+
+                        <option value="image">
+                            Images
+                        </option>
+
+                        <option value="audio">
+                            Audio
+                        </option>
+
+                        <option value="video">
+                            Video
+                        </option>
+
+                        <option value="other">
+                            Other
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </section>
+
+
+            <!-- =================================================
+                 FILE LIST
+                 ================================================= -->
+
+            <section
+                class="files-list-card"
+                aria-label="Your files"
+            >
+
+
+                <!-- Loading -->
+
+                <div
+                    class="files-loading"
+                    id="files-loading"
+                >
+
+                    <div class="files-spinner"></div>
+
+                    <span>
+                        Loading your encrypted vault...
+                    </span>
+
+                </div>
+
+
+                <!-- Empty -->
+
+                <div
+                    class="files-empty hidden"
+                    id="files-empty"
+                >
+
+                    <div class="files-empty-icon">
+
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden="true"
+                        >
+
+                            <path
+                                d="M4 7.5A2.5 2.5 0 0 1 6.5 5h3l2 2h6A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z"
+                                stroke="currentColor"
+                                stroke-width="1.6"
+                                stroke-linejoin="round"
+                            />
+
+                        </svg>
+
+                    </div>
+
+
+                    <h3 id="files-empty-title">
+                        No files yet
+                    </h3>
+
+
+                    <p id="files-empty-message">
+                        Upload your first file to start using your secure vault.
+                    </p>
+
+
+                    <button
+                        type="button"
+                        class="files-empty-button"
+                        id="files-empty-button"
+                    >
+                        Upload your first file
+                    </button>
+
+                </div>
+
+
+                <!-- File Table -->
+
+                <div
+                    class="files-table-wrap hidden"
+                    id="files-table-wrap"
+                >
+
+                    <div class="files-table-head">
+
+                        <div>
+                            File
+                        </div>
+
+                        <div>
+                            Size
+                        </div>
+
+                        <div>
+                            Uploaded
+                        </div>
+
+                        <div>
+                            Security
+                        </div>
+
+                        <div>
+                            Actions
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        class="files-table-body"
+                        id="files-table-body"
+                    ></div>
+
+                </div>
+
+            </section>
+
+
+            <!-- =================================================
+                 SECURITY NOTE
+                 ================================================= -->
+
+            <section class="files-security-note">
+
+                <div class="files-security-note-icon">
+
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        aria-hidden="true"
+                    >
+
+                        <path
+                            d="M12 3.5 19 6v5.4c0 4.5-2.8 7.6-7 9.1-4.2-1.5-7-4.6-7-9.1V6l7-2.5Z"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linejoin="round"
+                        />
+
+                        <path
+                            d="M9.5 12.1 11.2 14l3.6-4"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+
+                    </svg>
+
+                </div>
+
+
+                <div>
+
+                    <strong>
+                        Your files are encrypted
+                    </strong>
+
+                    <p>
+                        Files are encrypted before being stored in cloud storage.
+                        Cryptiva also verifies file integrity before downloads.
+                    </p>
+
+                </div>
+
+            </section>
+
+
+        </section>
+
+    </main>
+
+
+    <!-- =========================================================
+         DELETE MODAL
+         ========================================================= -->
+
+    <div
+        class="files-modal hidden"
+        id="files-delete-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="files-delete-title"
+    >
+
+        <div class="files-modal-backdrop"></div>
+
+
+        <div class="files-modal-card">
+
+            <div class="files-modal-icon danger">
+
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                >
+
+                    <path
+                        d="M5 7h14"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                    />
+
+                    <path
+                        d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                    />
+
+                    <path
+                        d="m7 7 .8 12.2h8.4L17 7"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linejoin="round"
+                    />
+
+                </svg>
+
+            </div>
+
+
+            <h2 id="files-delete-title">
+                Delete file?
+            </h2>
+
+
+            <p>
+                This will permanently remove the encrypted file
+                and its associated sharing configuration.
+            </p>
+
+
+            <div
+                class="files-delete-name"
+                id="files-delete-name"
+            ></div>
+
+
+            <div class="files-modal-actions">
+
+                <button
+                    type="button"
+                    class="files-modal-cancel"
+                    id="files-delete-cancel"
+                >
+                    Cancel
+                </button>
+
+
+                <button
+                    type="button"
+                    class="files-modal-danger"
+                    id="files-delete-confirm"
+                >
+                    Delete permanently
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         TOAST
+         ========================================================= -->
+
+    <div
+        class="files-toast"
+        id="files-toast"
+        role="status"
+        aria-live="polite"
+    ></div>
+
+
+    <!-- =========================================================
+         SCRIPTS
+         ========================================================= -->
+
+    <script src="/js/sidebar.js?v=20261006-2000"></script>
+
+    <script src="/js/sidebar-toggle.js?v=20261007-2000"></script>
+
+    <!-- ONLY files.js on this page -->
+    <script src="/js/files.js?v=20261007-2100"></script>
+
+
+</body>
+
+</html>

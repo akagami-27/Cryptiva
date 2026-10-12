@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="csrf-token"
+        content=""
+    >
+
+    <title>Cryptiva — Secure File Sharing</title>
+
+    <style>
+
+        :root {
+            --bg: #050510;
+            --text: #f5f5fa;
+            --muted: #9292aa;
+            --purple: #7c5cff;
+            --blue: #00c8ff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            overflow: hidden;
+
+            background:
+                radial-gradient(
+                    circle at 50% 45%,
+                    rgba(90, 70, 220, 0.08),
+                    transparent 35%
+                ),
+                #050510;
+
+            color: var(--text);
+
+            font-family:
+                'Segoe UI',
+                Inter,
+                system-ui,
+                sans-serif;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Three.js Background
+        |--------------------------------------------------------------------------
+        */
+
+        #background {
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 0;
+        }
+
+
+        .background-glow {
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 1;
+
+            pointer-events: none;
+
+            background:
+                radial-gradient(
+                    circle at center,
+                    transparent 20%,
+                    rgba(5, 5, 16, 0.18) 65%,
+                    rgba(5, 5, 16, 0.72) 100%
+                );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Main Content
+        |--------------------------------------------------------------------------
+        */
+
+        .page {
+            position: relative;
+
+            z-index: 5;
+
+            width: 100%;
+            height: 100vh;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            padding: 30px;
+        }
+
+
+        .hero {
+            width: min(600px, 100%);
+
+            text-align: center;
+
+            animation:
+                heroEnter 0.9s ease-out;
+        }
+
+
+        @keyframes heroEnter {
+
+            from {
+                opacity: 0;
+
+                transform:
+                    translateY(20px)
+                    scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+
+                transform:
+                    translateY(0)
+                    scale(1);
+            }
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Logo
+        |--------------------------------------------------------------------------
+        */
+
+        .logo {
+            width: 180px;
+
+            max-width: 45vw;
+
+            height: auto;
+
+            display: block;
+
+            margin: 0 auto 20px;
+
+            filter:
+                drop-shadow(
+                    0 0 35px
+                    rgba(90, 120, 255, 0.18)
+                );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Brand
+        |--------------------------------------------------------------------------
+        */
+
+        .brand {
+            margin: 0;
+
+            font-size:
+                clamp(42px, 7vw, 64px);
+
+            line-height: 1;
+
+            font-weight: 800;
+
+            letter-spacing:
+                clamp(3px, 0.8vw, 7px);
+
+            background:
+                linear-gradient(
+                    110deg,
+                    #ffffff 0%,
+                    #e8e9ff 45%,
+                    #8fa8ff 100%
+                );
+
+            -webkit-background-clip: text;
+            background-clip: text;
+
+            color: transparent;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Tagline
+        |--------------------------------------------------------------------------
+        */
+
+        .tagline {
+            margin: 17px 0 30px;
+
+            color: var(--muted);
+
+            font-size: 14px;
+
+            letter-spacing: 0.2px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hero Actions
+        |--------------------------------------------------------------------------
+        */
+
+        .hero-actions {
+            display: flex;
+
+            flex-direction: column;
+
+            align-items: center;
+
+            gap: 14px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Security Badge
+        |--------------------------------------------------------------------------
+        */
+
+        .security-badge {
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            gap: 8px;
+
+            padding:
+                8px 13px;
+
+            border-radius: 999px;
+
+            border:
+                1px solid
+                rgba(124, 92, 255, 0.18);
+
+            background:
+                rgba(124, 92, 255, 0.06);
+
+            color: #aaa2d8;
+
+            font-size: 11px;
+
+            font-weight: 600;
+
+            letter-spacing: 0.3px;
+
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+
+        .security-dot {
+            width: 6px;
+            height: 6px;
+
+            flex-shrink: 0;
+
+            border-radius: 50%;
+
+            background: #45dfaa;
+
+            box-shadow:
+                0 0 12px
+                rgba(69, 223, 170, 0.8);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Enter Vault Button
+        |--------------------------------------------------------------------------
+        */
+
+        .btn {
+            position: relative;
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            min-width: 170px;
+
+            height: 52px;
+
+            padding:
+                0 26px;
+
+            border-radius: 14px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--purple),
+                    var(--blue)
+                );
+
+            color: white;
+
+            text-decoration: none;
+
+            font-size: 14px;
+
+            font-weight: 700;
+
+            letter-spacing: 0.1px;
+
+            box-shadow:
+                0 14px 40px
+                rgba(74, 80, 255, 0.25);
+
+            overflow: hidden;
+
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease,
+                filter 0.2s ease;
+        }
+
+
+        .btn::before {
+            content: '';
+
+            position: absolute;
+
+            top: 0;
+            left: -120%;
+
+            width: 70%;
+            height: 100%;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255,255,255,0.22),
+                    transparent
+                );
+
+            transform:
+                skewX(-20deg);
+
+            transition:
+                left 0.65s ease;
+        }
+
+
+        .btn:hover {
+            transform:
+                translateY(-3px);
+
+            filter:
+                brightness(1.07);
+
+            box-shadow:
+                0 18px 50px
+                rgba(74, 80, 255, 0.35);
+        }
+
+
+        .btn:hover::before {
+            left: 140%;
+        }
+
+
+        .btn:active {
+            transform:
+                translateY(-1px);
+        }
+
+
+        .btn-arrow {
+            margin-left: 9px;
+
+            font-size: 17px;
+
+            transition:
+                transform 0.2s ease;
+        }
+
+
+        .btn:hover .btn-arrow {
+            transform:
+                translateX(4px);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Footer
+        |--------------------------------------------------------------------------
+        */
+
+        .footer {
+            position: fixed;
+
+            left: 50%;
+
+            bottom: 22px;
+
+            transform:
+                translateX(-50%);
+
+            z-index: 6;
+
+            color: #4f4f62;
+
+            font-size: 10px;
+
+            letter-spacing: 0.5px;
+
+            white-space: nowrap;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mobile
+        |--------------------------------------------------------------------------
+        */
+
+        @media (max-width: 600px) {
+
+            .page {
+                padding: 20px;
+            }
+
+            .logo {
+                width: 145px;
+
+                margin-bottom: 17px;
+            }
+
+            .tagline {
+                font-size: 13px;
+
+                margin-top: 14px;
+
+                margin-bottom: 24px;
+            }
+
+            .btn {
+                width: 100%;
+
+                max-width: 220px;
+            }
+
+            .security-badge {
+                font-size: 10px;
+            }
+
+        }
+
+    </style>
+</head>
+
+
+<body>
+
+
+<!--
+|--------------------------------------------------------------------------
+| Animated Background
+|--------------------------------------------------------------------------
+-->
+
+<div id="background"></div>
+
+<div class="background-glow"></div>
+
+
+<!--
+|--------------------------------------------------------------------------
+| Main Landing Page
+|--------------------------------------------------------------------------
+-->
+
+<main class="page">
+
+    <section class="hero">
+
+
+        <!-- Logo -->
+
+        <img
+            class="logo"
+            src="/images/logo.png"
+            alt="Cryptiva logo"
+        >
+
+
+        <!-- Brand -->
+
+        <h1 class="brand">
+            CRYPTIVA
+        </h1>
+
+
+        <!-- Description -->
+
+        <p class="tagline">
+            Secure File Sharing with AES Encryption
+        </p>
+
+
+        <!--
+        |--------------------------------------------------------------------------
+        | Actions
+        |--------------------------------------------------------------------------
+        -->
+
+        <div class="hero-actions">
+
+
+            <!-- Enter Vault -->
+
+            <a
+                class="btn"
+                href="/login"
+            >
+
+                Enter Vault
+
+                <span class="btn-arrow">
+                    →
+                </span>
+
+            </a>
+
+
+            <!-- Security Badge -->
+
+            <div class="security-badge">
+
+                <span class="security-dot"></span>
+
+                Encrypted. Private. Controlled.
+
+            </div>
+
+
+        </div>
+
+
+    </section>
+
+</main>
+
+
+<!-- Footer -->
+
+<div class="footer">
+    CRYPTIVA · SECURE FILE SHARING
+</div>
+
+
+<!--
+|--------------------------------------------------------------------------
+| Three.js
+|--------------------------------------------------------------------------
+-->
+
+<script
+    src="https://unpkg.com/three@0.134.0/build/three.min.js"
+></script>
+
+
+<script>
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scene
+    |--------------------------------------------------------------------------
+    */
+
+    const scene =
+        new THREE.Scene();
+
+
+    const camera =
+        new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth /
+                window.innerHeight,
+            0.1,
+            1000
+        );
+
+
+    const renderer =
+        new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true
+        });
+
+
+    renderer.setPixelRatio(
+        Math.min(
+            window.devicePixelRatio,
+            2
+        )
+    );
+
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
+
+
+    document
+        .getElementById('background')
+        .appendChild(
+            renderer.domElement
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Star Field
+    |--------------------------------------------------------------------------
+    */
+
+    const starGeometry =
+        new THREE.BufferGeometry();
+
+
+    const starCount = 1000;
+
+
+    const positions = [];
+
+    const colors = [];
+
+
+    for (
+        let i = 0;
+        i < starCount;
+        i++
+    ) {
+
+        positions.push(
+            (Math.random() - 0.5) * 50,
+            (Math.random() - 0.5) * 50,
+            -Math.random() * 50
+        );
+
+
+        const random =
+            Math.random();
+
+
+        if (
+            random < 0.5
+        ) {
+
+            colors.push(
+                0.49,
+                0.36,
+                1.0
+            );
+
+        } else if (
+            random < 0.8
+        ) {
+
+            colors.push(
+                0.0,
+                0.83,
+                1.0
+            );
+
+        } else {
+
+            colors.push(
+                0.3,
+                0.6,
+                1.0
+            );
+
+        }
+
+    }
+
+
+    starGeometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(
+            positions,
+            3
+        )
+    );
+
+
+    starGeometry.setAttribute(
+        'color',
+        new THREE.Float32BufferAttribute(
+            colors,
+            3
+        )
+    );
+
+
+    const starMaterial =
+        new THREE.PointsMaterial({
+            size: 0.05,
+
+            vertexColors: true,
+
+            transparent: true,
+
+            opacity: 0.85
+        });
+
+
+    const stars =
+        new THREE.Points(
+            starGeometry,
+            starMaterial
+        );
+
+
+    scene.add(stars);
+
+
+    camera.position.z = 5;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Animation
+    |--------------------------------------------------------------------------
+    */
+
+    let speed = 0.004;
+
+    let targetSpeed = 0.004;
+
+
+    let mouseX = 0;
+
+    let mouseY = 0;
+
+
+    window.addEventListener(
+        'mousemove',
+        (event) => {
+
+            mouseX =
+                event.clientX /
+                    window.innerWidth -
+                0.5;
+
+
+            mouseY =
+                event.clientY /
+                    window.innerHeight -
+                0.5;
+
+
+            targetSpeed =
+                0.018;
+        }
+    );
+
+
+    window.addEventListener(
+        'mouseleave',
+        () => {
+
+            targetSpeed =
+                0.004;
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Render Loop
+    |--------------------------------------------------------------------------
+    */
+
+    function animate() {
+
+        requestAnimationFrame(
+            animate
+        );
+
+
+        speed +=
+            (
+                targetSpeed -
+                speed
+            ) * 0.04;
+
+
+        stars.rotation.z +=
+            speed;
+
+
+        camera.position.x +=
+            (
+                mouseX * 0.5 -
+                camera.position.x
+            ) * 0.025;
+
+
+        camera.position.y +=
+            (
+                -mouseY * 0.5 -
+                camera.position.y
+            ) * 0.025;
+
+
+        renderer.render(
+            scene,
+            camera
+        );
+    }
+
+
+    animate();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Responsive
+    |--------------------------------------------------------------------------
+    */
+
+    window.addEventListener(
+        'resize',
+        () => {
+
+            camera.aspect =
+                window.innerWidth /
+                window.innerHeight;
+
+
+            camera.updateProjectionMatrix();
+
+
+            renderer.setSize(
+                window.innerWidth,
+                window.innerHeight
+            );
+
+        }
+    );
+
+</script>
+
+</body>
+
+</html>

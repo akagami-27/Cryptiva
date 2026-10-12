@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="csrf-token"
+        content=""
+    >
+
+    <title>
+        Security · Cryptiva
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="/css/sidebar.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/css/security.css?v=20261007-SECURITY"
+    >
+
+</head>
+
+
+<body class="security-page">
+
+    <main class="security-page">
+
+        <div class="security-shell">
+
+            <div class="security-content">
+
+
+                <!-- =====================================================
+                     HEADER
+                     ===================================================== -->
+
+                <header class="security-header">
+
+                    <div class="security-header-copy">
+
+                        <div class="security-eyebrow">
+
+                            <span
+                                class="security-eyebrow-dot"
+                            ></span>
+
+                            ACCOUNT SECURITY
+
+                        </div>
+
+
+                        <h1>
+                            Security
+                        </h1>
+
+
+                        <p>
+                            Protect your Cryptiva account and manage your password securely.
+                        </p>
+
+                    </div>
+
+                </header>
+
+
+
+                <!-- =====================================================
+                     ACCOUNT SECURITY STATUS
+                     ===================================================== -->
+
+                <section class="security-status-grid">
+
+
+                    <article class="security-status-card">
+
+                        <div class="security-status-icon purple">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            >
+
+                                <path
+                                    d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6l-7-3z"
+                                ></path>
+
+                                <path
+                                    d="m9 12 2 2 4-4"
+                                ></path>
+
+                            </svg>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Account
+                            </span>
+
+                            <strong
+                                id="security-username"
+                            >
+                                Loading...
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+
+
+                    <article class="security-status-card">
+
+                        <div class="security-status-icon green">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            >
+
+                                <path
+                                    d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6l-7-3z"
+                                ></path>
+
+                                <path
+                                    d="M8.5 12.2 11 14.5l4.5-5"
+                                ></path>
+
+                            </svg>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Account Status
+                            </span>
+
+                            <strong
+                                id="security-status"
+                            >
+                                Active
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+
+
+                    <article class="security-status-card">
+
+                        <div class="security-status-icon blue">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            >
+
+                                <circle
+                                    cx="12"
+                                    cy="12"
+                                    r="9"
+                                ></circle>
+
+                                <path
+                                    d="M12 7v5l3 2"
+                                ></path>
+
+                            </svg>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Security Monitoring
+                            </span>
+
+                            <strong>
+                                Enabled
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+                </section>
+
+
+
+                <!-- =====================================================
+                     CHANGE PASSWORD
+                     ===================================================== -->
+
+                <section class="security-panel">
+
+                    <div class="security-panel-header">
+
+                        <div>
+
+                            <div class="security-section-label">
+
+                                <span></span>
+
+                                PASSWORD
+
+                            </div>
+
+
+                            <h2>
+                                Change Password
+                            </h2>
+
+
+                            <p>
+                                Update your account password to keep your vault protected.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <form
+                        id="change-password-form"
+                        class="password-form"
+                        autocomplete="off"
+                    >
+
+
+                        <!-- CURRENT PASSWORD -->
+
+                        <div class="password-field">
+
+                            <label
+                                for="current-password"
+                            >
+                                Current password
+                            </label>
+
+
+                            <div class="password-input-wrapper">
+
+                                <svg
+                                    class="password-input-icon"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                >
+
+                                    <rect
+                                        x="4"
+                                        y="10"
+                                        width="16"
+                                        height="11"
+                                        rx="2"
+                                    ></rect>
+
+                                    <path
+                                        d="M8 10V7a4 4 0 0 1 8 0v3"
+                                    ></path>
+
+                                </svg>
+
+
+                                <input
+                                    id="current-password"
+                                    name="currentPassword"
+                                    type="password"
+                                    minlength="8"
+                                    maxlength="128"
+                                    autocomplete="current-password"
+                                    required
+                                    placeholder="Enter current password"
+                                >
+
+
+                                <button
+                                    type="button"
+                                    class="password-toggle"
+                                    data-target="current-password"
+                                    aria-label="Show password"
+                                >
+
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                    >
+
+                                        <path
+                                            d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"
+                                        ></path>
+
+                                        <circle
+                                            cx="12"
+                                            cy="12"
+                                            r="2.5"
+                                        ></circle>
+
+                                    </svg>
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- NEW PASSWORD -->
+
+                        <div class="password-field">
+
+                            <label
+                                for="new-password"
+                            >
+                                New password
+                            </label>
+
+
+                            <div class="password-input-wrapper">
+
+                                <svg
+                                    class="password-input-icon"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                >
+
+                                    <rect
+                                        x="4"
+                                        y="10"
+                                        width="16"
+                                        height="11"
+                                        rx="2"
+                                    ></rect>
+
+                                    <path
+                                        d="M8 10V7a4 4 0 0 1 8 0v3"
+                                    ></path>
+
+                                </svg>
+
+
+                                <input
+                                    id="new-password"
+                                    name="newPassword"
+                                    type="password"
+                                    minlength="8"
+                                    maxlength="128"
+                                    autocomplete="new-password"
+                                    required
+                                    placeholder="Enter new password"
+                                >
+
+
+                                <button
+                                    type="button"
+                                    class="password-toggle"
+                                    data-target="new-password"
+                                    aria-label="Show password"
+                                >
+
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                    >
+
+                                        <path
+                                            d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"
+                                        ></path>
+
+                                        <circle
+                                            cx="12"
+                                            cy="12"
+                                            r="2.5"
+                                        ></circle>
+
+                                    </svg>
+
+                                </button>
+
+                            </div>
+
+
+                            <div
+                                class="password-strength"
+                                id="password-strength"
+                            >
+
+                                <div class="strength-bars">
+
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+
+                                </div>
+
+
+                                <span
+                                    id="strength-label"
+                                >
+                                    Enter a password
+                                </span>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- CONFIRM PASSWORD -->
+
+                        <div class="password-field">
+
+                            <label
+                                for="confirm-password"
+                            >
+                                Confirm new password
+                            </label>
+
+
+                            <div class="password-input-wrapper">
+
+                                <svg
+                                    class="password-input-icon"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                >
+
+                                    <rect
+                                        x="4"
+                                        y="10"
+                                        width="16"
+                                        height="11"
+                                        rx="2"
+                                    ></rect>
+
+                                    <path
+                                        d="M8 10V7a4 4 0 0 1 8 0v3"
+                                    ></path>
+
+                                </svg>
+
+
+                                <input
+                                    id="confirm-password"
+                                    name="confirmPassword"
+                                    type="password"
+                                    minlength="8"
+                                    maxlength="128"
+                                    autocomplete="new-password"
+                                    required
+                                    placeholder="Confirm new password"
+                                >
+
+
+                                <button
+                                    type="button"
+                                    class="password-toggle"
+                                    data-target="confirm-password"
+                                    aria-label="Show password"
+                                >
+
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                    >
+
+                                        <path
+                                            d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"
+                                        ></path>
+
+                                        <circle
+                                            cx="12"
+                                            cy="12"
+                                            r="2.5"
+                                        ></circle>
+
+                                    </svg>
+
+                                </button>
+
+                            </div>
+
+
+                            <div
+                                class="password-match"
+                                id="password-match"
+                            ></div>
+
+                        </div>
+
+
+
+                        <!-- REQUIREMENTS -->
+
+                        <div class="password-requirements">
+
+                            <div class="requirements-title">
+
+                                Password requirements
+
+                            </div>
+
+
+                            <div class="requirements-grid">
+
+                                <span
+                                    data-rule="length"
+                                >
+                                    <i></i>
+                                    8–128 characters
+                                </span>
+
+
+                                <span
+                                    data-rule="lowercase"
+                                >
+                                    <i></i>
+                                    Lowercase letter
+                                </span>
+
+
+                                <span
+                                    data-rule="uppercase"
+                                >
+                                    <i></i>
+                                    Uppercase letter
+                                </span>
+
+
+                                <span
+                                    data-rule="number"
+                                >
+                                    <i></i>
+                                    Number
+                                </span>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- ACTION -->
+
+                        <div class="password-form-footer">
+
+                            <div
+                                class="password-security-note"
+                            >
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                >
+
+                                    <path
+                                        d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6l-7-3z"
+                                    ></path>
+
+                                    <path
+                                        d="M12 8v4"
+                                    ></path>
+
+                                    <circle
+                                        cx="12"
+                                        cy="16"
+                                        r=".6"
+                                        fill="currentColor"
+                                    ></circle>
+
+                                </svg>
+
+
+                                <span>
+                                    Your password is securely hashed before being stored.
+                                </span>
+
+                            </div>
+
+
+                            <button
+                                type="submit"
+                                class="change-password-button"
+                                id="change-password-button"
+                            >
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                >
+
+                                    <path
+                                        d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6l-7-3z"
+                                    ></path>
+
+                                    <path
+                                        d="M8.5 12.2 11 14.5l4.5-5"
+                                    ></path>
+
+                                </svg>
+
+                                Change Password
+
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </section>
+
+
+
+                <!-- =====================================================
+                     SECURITY ACTIVITY
+                     ===================================================== -->
+
+                <section class="security-panel">
+
+                    <div class="security-panel-header">
+
+                        <div>
+
+                            <div class="security-section-label">
+
+                                <span></span>
+
+                                SECURITY ACTIVITY
+
+                            </div>
+
+
+                            <h2>
+                                Recent Security Activity
+                            </h2>
+
+
+                            <p>
+                                Security-related actions recorded for your account.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        class="security-activity-list"
+                        id="security-activity-list"
+                    >
+
+                        <div class="security-loading">
+                            Loading security activity...
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+
+                <!-- =====================================================
+                     SECURITY NOTICE
+                     ===================================================== -->
+
+                <section class="security-notice">
+
+                    <div class="security-notice-icon">
+
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                        >
+
+                            <path
+                                d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6l-7-3z"
+                            ></path>
+
+                            <path
+                                d="M12 8v4"
+                            ></path>
+
+                            <circle
+                                cx="12"
+                                cy="16"
+                                r=".6"
+                                fill="currentColor"
+                            ></circle>
+
+                        </svg>
+
+                    </div>
+
+
+                    <div>
+
+                        <strong>
+                            Keep your account secure
+                        </strong>
+
+                        <p>
+                            Never share your Cryptiva password with anyone.
+                            If you suspect unauthorized access, change your password immediately.
+                        </p>
+
+                    </div>
+
+                </section>
+
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+    <div
+        id="security-toast-region"
+        class="security-toast-region"
+        aria-live="polite"
+    ></div>
+
+
+    <script src="/js/sidebar.js"></script>
+
+    <script src="/js/sidebar-toggle.js"></script>
+
+    <script src="/js/security.js?v=20261007-SECURITY"></script>
+
+</body>
+
+</html>

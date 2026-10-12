@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cryptiva
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cryptiva
+  template:
+    metadata:
+      labels:
+        app: cryptiva
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: cryptiva
+          image: ghcr.io/your-org/cryptiva:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: cryptiva-config
+          env:
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cryptiva-secrets
+                  key: SESSION_SECRET
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: cryptiva-secrets
+                  key: MONGODB_URI
+            - name: MASTER_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cryptiva-secrets
+                  key: MASTER_ENCRYPTION_KEY
+            - name: SUPABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cryptiva-secrets
+                  key: SUPABASE_URL
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cryptiva-secrets
+                  key: SUPABASE_SERVICE_ROLE_KEY
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cryptiva
+spec:
+  type: ClusterIP
+  selector:
+    app: cryptiva
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

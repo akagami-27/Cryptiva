@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="csrf-token"
+        content=""
+    >
+
+    <title>
+        Profile · Cryptiva
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="/css/sidebar.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/css/profile.css?v=20261007-PROFILE"
+    >
+
+</head>
+
+
+<body class="profile-page">
+
+    <main class="profile-page">
+
+        <div class="profile-shell">
+
+            <div class="profile-content">
+
+
+                <!-- HEADER -->
+
+                <header class="profile-header">
+
+                    <div class="profile-header-copy">
+
+                        <div class="profile-eyebrow">
+
+                            <span
+                                class="profile-eyebrow-dot"
+                            ></span>
+
+                            ACCOUNT PROFILE
+
+                        </div>
+
+
+                        <h1>
+                            Profile
+                        </h1>
+
+
+                        <p>
+                            Manage your Cryptiva account information and preferences.
+                        </p>
+
+                    </div>
+
+                </header>
+
+
+
+                <!-- PROFILE STATUS -->
+
+                <section class="profile-status-grid">
+
+
+                    <article class="profile-status-card">
+
+                        <div class="profile-status-icon purple">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            >
+
+                                <circle
+                                    cx="12"
+                                    cy="8"
+                                    r="3.2"
+                                ></circle>
+
+                                <path
+                                    d="M5.5 20c.8-3.5 3-5.3 6.5-5.3s5.7 1.8 6.5 5.3"
+                                ></path>
+
+                            </svg>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Username
+                            </span>
+
+                            <strong
+                                id="profile-username-card"
+                            >
+                                Loading...
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+
+
+                    <article class="profile-status-card">
+
+                        <div class="profile-status-icon green">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            >
+
+                                <path
+                                    d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6l-7-3z"
+                                ></path>
+
+                                <path
+                                    d="M8.5 12.2 11 14.5l4.5-5"
+                                ></path>
+
+                            </svg>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Account Status
+                            </span>
+
+                            <strong
+                                id="profile-status"
+                            >
+                                Active
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+
+
+                    <article class="profile-status-card">
+
+                        <div class="profile-status-icon blue">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            >
+
+                                <circle
+                                    cx="12"
+                                    cy="12"
+                                    r="9"
+                                ></circle>
+
+                                <path
+                                    d="M12 7v5l3 2"
+                                ></path>
+
+                            </svg>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Member Since
+                            </span>
+
+                            <strong
+                                id="profile-created"
+                            >
+                                Loading...
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+                </section>
+
+
+
+                <!-- PROFILE FORM -->
+
+                <section class="profile-panel">
+
+                    <div class="profile-panel-header">
+
+                        <div>
+
+                            <div class="profile-section-label">
+
+                                <span></span>
+
+                                ACCOUNT INFORMATION
+
+                            </div>
+
+
+                            <h2>
+                                Profile Information
+                            </h2>
+
+
+                            <p>
+                                Update the information associated with your Cryptiva account.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <form
+                        id="profile-form"
+                        class="profile-form"
+                        autocomplete="off"
+                    >
+
+                        <div class="profile-field">
+
+                            <label
+                                for="username"
+                            >
+                                Username
+                            </label>
+
+
+                            <div class="profile-input-wrapper">
+
+                                <svg
+                                    class="profile-input-icon"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                >
+
+                                    <circle
+                                        cx="12"
+                                        cy="8"
+                                        r="3"
+                                    ></circle>
+
+                                    <path
+                                        d="M5 20c.7-3.3 3-5 7-5s6.3 1.7 7 5"
+                                    ></path>
+
+                                </svg>
+
+
+                                <input
+                                    id="username"
+                                    name="username"
+                                    type="text"
+                                    minlength="3"
+                                    maxlength="20"
+                                    autocomplete="username"
+                                    required
+                                    placeholder="Enter username"
+                                >
+
+                            </div>
+
+
+                            <div class="profile-help">
+
+                                3–20 characters. Letters, numbers, and underscores only.
+
+                            </div>
+
+                        </div>
+
+
+
+                        <div class="profile-actions">
+
+                            <button
+                                id="save-profile-button"
+                                type="submit"
+                                class="profile-save-button"
+                            >
+
+                                <span>
+                                    Save Changes
+                                </span>
+
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </section>
+
+
+
+                <!-- ACCOUNT INFORMATION -->
+
+                <section class="profile-panel profile-details-panel">
+
+                    <div class="profile-panel-header">
+
+                        <div>
+
+                            <div class="profile-section-label">
+
+                                <span></span>
+
+                                ACCOUNT DETAILS
+
+                            </div>
+
+
+                            <h2>
+                                Account Details
+                            </h2>
+
+
+                            <p>
+                                Information about your Cryptiva account.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="profile-details-grid">
+
+                        <div class="profile-detail">
+
+                            <span>
+                                Account Status
+                            </span>
+
+                            <strong
+                                id="profile-detail-status"
+                            >
+                                Active
+                            </strong>
+
+                        </div>
+
+
+                        <div class="profile-detail">
+
+                            <span>
+                                Account Created
+                            </span>
+
+                            <strong
+                                id="profile-detail-created"
+                            >
+                                Loading...
+                            </strong>
+
+                        </div>
+
+
+                        <div class="profile-detail">
+
+                            <span>
+                                Last Profile Update
+                            </span>
+
+                            <strong
+                                id="profile-detail-updated"
+                            >
+                                Loading...
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+
+
+                <!-- TOAST -->
+
+                <div
+                    id="profile-toast-region"
+                    class="profile-toast-region"
+                    aria-live="polite"
+                    aria-atomic="true"
+                ></div>
+
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+   <script src="/js/sidebar.js"></script>
+
+   <script src="/js/profile.js"></script>
+
+</body>
+
+</html>

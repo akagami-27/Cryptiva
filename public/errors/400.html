@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>400 — Bad Request | Cryptiva</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.14), transparent 30%),
+                radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.12), transparent 30%),
+                #070b14;
+            color: #f8fafc;
+        }
+
+        .card {
+            width: min(520px, 100%);
+            padding: 48px 36px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            background: rgba(15, 23, 42, 0.82);
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(18px);
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 38px;
+        }
+
+        .logo span {
+            color: #60a5fa;
+        }
+
+        .code {
+            font-size: 88px;
+            line-height: 1;
+            font-weight: 900;
+            letter-spacing: -5px;
+            color: #60a5fa;
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            font-size: 26px;
+            margin-bottom: 12px;
+        }
+
+        p {
+            color: #94a3b8;
+            line-height: 1.7;
+            margin-bottom: 30px;
+        }
+
+        a {
+            display: inline-block;
+            padding: 12px 22px;
+            border-radius: 12px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            font-weight: 700;
+            transition: 0.2s;
+        }
+
+        a:hover {
+            background: #3b82f6;
+            transform: translateY(-1px);
+        }
+
+        .hint {
+            margin-top: 22px;
+            font-size: 12px;
+            color: #64748b;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="card">
+        <div class="logo">Crypt<span>iva</span></div>
+
+        <div class="code">400</div>
+
+        <h1>Bad Request</h1>
+
+        <p>
+            The request could not be understood or processed by Cryptiva.
+            Please check your request and try again.
+        </p>
+
+        <a href="/">Return to Cryptiva</a>
+
+        <div class="hint">
+            Request could not be processed.
+        </div>
+    </main>
+</body>
+</html>

@@ -1,0 +1,3653 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="csrf-token"
+        content="<%= csrfToken %>"
+    >
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="theme-color"
+        content="#05050d"
+    >
+
+    <link
+    rel="stylesheet"
+    href="/css/sidebar.css?v=20261006-2000"
+    >
+
+    <title>Cryptiva — Secure Vault</title>
+
+    <style>
+
+        /* =========================================================
+           ROOT
+           ========================================================= */
+
+        :root {
+            --bg: #05050d;
+            --panel: rgba(12, 12, 24, 0.82);
+            --panel-soft: rgba(255, 255, 255, 0.025);
+
+            --border: rgba(255, 255, 255, 0.075);
+            --border-soft: rgba(255, 255, 255, 0.05);
+
+            --text: #f2f2f7;
+            --muted: #77778c;
+            --muted-2: #5e5e72;
+
+            --purple: #7c5cff;
+            --cyan: #00d4ff;
+            --green: #55e3b3;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+
+            background:
+                radial-gradient(
+                    circle at 10% 0%,
+                    rgba(124, 92, 255, 0.16),
+                    transparent 30%
+                ),
+                radial-gradient(
+                    circle at 100% 60%,
+                    rgba(0, 212, 255, 0.09),
+                    transparent 32%
+                ),
+                #05050d;
+
+            color: var(--text);
+
+            font-family:
+                Inter,
+                "Segoe UI",
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
+
+
+        /* =========================================================
+           NAVBAR
+           ========================================================= */
+
+        .navbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+
+            height: 84px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            padding: 0 clamp(20px, 5vw, 80px);
+
+            border-bottom:
+                1px solid rgba(255, 255, 255, 0.055);
+
+            background:
+                rgba(5, 5, 13, 0.78);
+
+            backdrop-filter: blur(24px);
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+
+            color: white;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 14px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #7c5cff,
+                    #00cfff
+                );
+
+            box-shadow:
+                0 0 35px rgba(124, 92, 255, 0.28);
+
+            font-size: 19px;
+        }
+
+        .logo-text {
+            font-size: 19px;
+            font-weight: 800;
+            letter-spacing: 2.5px;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border:
+                1px solid rgba(124, 92, 255, 0.35);
+
+            border-radius: 50%;
+
+            color: #d9d4ff;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(124, 92, 255, 0.18),
+                    rgba(0, 212, 255, 0.08)
+                );
+
+            font-size: 13px;
+            font-weight: 750;
+        }
+
+        .nav-username {
+            max-width: 130px;
+
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+
+            color: #858599;
+
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .btn-logout {
+            height: 42px;
+
+            padding: 0 17px;
+            margin-left: 6px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.08);
+
+            border-radius: 12px;
+
+            color: #aaaabb;
+            background: rgba(255, 255, 255, 0.025);
+
+            cursor: pointer;
+
+            font-size: 12px;
+            font-weight: 650;
+
+            transition: 0.2s ease;
+        }
+
+        .btn-logout:hover {
+            color: white;
+
+            border-color:
+                rgba(255, 255, 255, 0.16);
+
+            background:
+                rgba(255, 255, 255, 0.06);
+
+            transform: translateY(-1px);
+        }
+
+
+        /* =========================================================
+           MAIN
+           ========================================================= */
+
+        .main {
+            width: min(
+                1240px,
+                calc(100% - 40px)
+            );
+
+            margin: 0 auto;
+
+            padding:
+                55px
+                0
+                80px;
+        }
+
+
+        /* =========================================================
+           HERO
+           ========================================================= */
+
+        .dashboard-hero {
+            position: relative;
+            overflow: hidden;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 30px;
+
+            min-height: 190px;
+
+            padding: 34px 38px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.08);
+
+            border-radius: 26px;
+
+            background:
+                radial-gradient(
+                    circle at 100% 0%,
+                    rgba(124, 92, 255, 0.11),
+                    transparent 35%
+                ),
+                radial-gradient(
+                    circle at 0% 100%,
+                    rgba(0, 212, 255, 0.045),
+                    transparent 35%
+                ),
+                rgba(12, 12, 23, 0.75);
+
+            box-shadow:
+                0 25px 70px rgba(0, 0, 0, 0.22);
+
+            backdrop-filter: blur(20px);
+        }
+
+        .dashboard-hero::after {
+            content: "";
+
+            position: absolute;
+
+            width: 250px;
+            height: 250px;
+
+            right: -100px;
+            top: -130px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(124, 92, 255, 0.08);
+
+            filter: blur(40px);
+
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+
+            margin-bottom: 13px;
+
+            padding: 7px 11px;
+
+            border:
+                1px solid rgba(124, 92, 255, 0.2);
+
+            border-radius: 999px;
+
+            color: #aaa2dc;
+            background: rgba(124, 92, 255, 0.06);
+
+            font-size: 10px;
+            font-weight: 750;
+            letter-spacing: 0.7px;
+        }
+
+        .hero-dot {
+            width: 6px;
+            height: 6px;
+
+            border-radius: 50%;
+
+            background: var(--green);
+
+            box-shadow:
+                0 0 10px rgba(85, 227, 179, 0.65);
+        }
+
+        .hero-title {
+            margin: 0;
+
+            color: #f5f5fa;
+
+            font-size:
+                clamp(28px, 3.2vw, 40px);
+
+            font-weight: 780;
+            letter-spacing: -1.4px;
+        }
+
+        .hero-title span {
+            color: #8fbcff;
+        }
+
+        .hero-subtitle {
+            margin: 9px 0 0;
+
+            color: #77778a;
+
+            font-size: 14px;
+        }
+
+        .hero-actions {
+            position: relative;
+            z-index: 2;
+
+            flex-shrink: 0;
+        }
+
+        .hero-upload {
+            height: 56px;
+
+            padding: 0 25px;
+
+            border: none;
+            border-radius: 16px;
+
+            color: white;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #7457ff,
+                    #00cfff
+                );
+
+            box-shadow:
+                0 14px 35px rgba(0, 185, 255, 0.15),
+                0 10px 35px rgba(124, 92, 255, 0.18);
+
+            cursor: pointer;
+
+            font-size: 14px;
+            font-weight: 750;
+
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+        .hero-upload:hover {
+            transform: translateY(-2px);
+
+            box-shadow:
+                0 18px 45px rgba(0, 185, 255, 0.2),
+                0 14px 40px rgba(124, 92, 255, 0.25);
+        }
+
+
+        /* =========================================================
+           STATS
+           ========================================================= */
+
+        .stats {
+            display: grid;
+
+            grid-template-columns:
+                repeat(3, 1fr);
+
+            gap: 16px;
+
+            margin-top: 22px;
+        }
+
+        .stat-card {
+            min-height: 108px;
+
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+
+            padding: 22px 24px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.06);
+
+            border-radius: 19px;
+
+            background:
+                rgba(12, 12, 23, 0.72);
+
+            transition:
+                border-color 0.2s ease,
+                transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+
+            border-color:
+                rgba(124, 92, 255, 0.16);
+        }
+
+        .stat-label {
+            margin-bottom: 7px;
+
+            color: #66667a;
+
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .stat-val {
+            color: #ededf4;
+
+            font-size: 27px;
+            font-weight: 750;
+            letter-spacing: -1px;
+        }
+
+        .stat-val.accent {
+            color: #a998ff;
+        }
+
+        .stat-val.success {
+            color: #63ddb8;
+        }
+
+
+        /* =========================================================
+           UPLOAD
+           ========================================================= */
+
+        .upload-zone {
+            position: relative;
+
+            min-height: 190px;
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+
+            margin-top: 22px;
+            padding: 30px;
+
+            border:
+                1px dashed rgba(124, 92, 255, 0.25);
+
+            border-radius: 23px;
+
+            background:
+                radial-gradient(
+                    circle at 0% 50%,
+                    rgba(124, 92, 255, 0.06),
+                    transparent 40%
+                ),
+                radial-gradient(
+                    circle at 100% 50%,
+                    rgba(0, 212, 255, 0.055),
+                    transparent 40%
+                ),
+                rgba(10, 10, 20, 0.55);
+
+            cursor: pointer;
+
+            transition:
+                border-color 0.2s ease,
+                background 0.2s ease,
+                transform 0.2s ease;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.drag-active {
+            border-color:
+                rgba(124, 92, 255, 0.65);
+
+            background:
+                radial-gradient(
+                    circle at 0% 50%,
+                    rgba(124, 92, 255, 0.1),
+                    transparent 45%
+                ),
+                radial-gradient(
+                    circle at 100% 50%,
+                    rgba(0, 212, 255, 0.08),
+                    transparent 45%
+                ),
+                rgba(10, 10, 20, 0.7);
+
+            transform: translateY(-1px);
+        }
+
+        #file-input {
+            position: absolute;
+
+            width: 1px;
+            height: 1px;
+
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .upload-icon {
+            width: 54px;
+            height: 54px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            margin-bottom: 13px;
+
+            border:
+                1px solid rgba(124, 92, 255, 0.2);
+
+            border-radius: 16px;
+
+            background:
+                rgba(124, 92, 255, 0.06);
+
+            font-size: 22px;
+        }
+
+        .upload-zone h3 {
+            margin: 0;
+
+            color: #e7e7ef;
+
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .upload-zone p {
+            margin: 7px 0 0;
+
+            color: #626276;
+
+            font-size: 11px;
+        }
+
+
+        /* =========================================================
+           PROGRESS
+           ========================================================= */
+
+        .progress-wrap {
+            width: min(450px, 100%);
+
+            margin-top: 18px;
+        }
+
+        .progress-label {
+            margin-bottom: 7px;
+
+            color: #8d8da0;
+
+            text-align: center;
+
+            font-size: 10px;
+        }
+
+        .progress-bar {
+            height: 5px;
+
+            overflow: hidden;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255, 255, 255, 0.07);
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+
+            border-radius: inherit;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    #7c5cff,
+                    #00d4ff
+                );
+
+            transition:
+                width 0.15s ease;
+        }
+
+
+        /* =========================================================
+           FILE SECTION
+           ========================================================= */
+
+        .file-list-section {
+            position: relative;
+
+            width: 100%;
+
+            margin-top: 22px;
+            padding: 30px;
+
+            overflow: hidden;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.075);
+
+            border-radius: 26px;
+
+            background:
+                radial-gradient(
+                    circle at 100% 0%,
+                    rgba(0, 212, 255, 0.055),
+                    transparent 34%
+                ),
+                radial-gradient(
+                    circle at 0% 100%,
+                    rgba(124, 92, 255, 0.06),
+                    transparent 40%
+                ),
+                rgba(10, 10, 20, 0.78);
+
+            box-shadow:
+                0 25px 70px rgba(0, 0, 0, 0.2);
+        }
+
+        .file-list-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+
+            gap: 25px;
+
+            margin-bottom: 25px;
+        }
+
+        .file-list-heading {
+            min-width: 0;
+        }
+
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+
+            margin-bottom: 9px;
+
+            color: #8078b5;
+
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 1.4px;
+        }
+
+        .section-label-dot {
+            width: 6px;
+            height: 6px;
+
+            border-radius: 50%;
+
+            background: var(--green);
+
+            box-shadow:
+                0 0 9px rgba(85, 227, 179, 0.65);
+        }
+
+        .file-list-heading h2 {
+            margin: 0;
+
+            color: #f0f0f6;
+
+            font-size: 23px;
+            font-weight: 750;
+            letter-spacing: -0.6px;
+        }
+
+        .file-list-heading p {
+            margin: 6px 0 0;
+
+            color: #66667a;
+
+            font-size: 12px;
+        }
+
+
+        /* =========================================================
+           SEARCH
+           ========================================================= */
+
+        .file-search {
+            position: relative;
+
+            width: 300px;
+            flex-shrink: 0;
+        }
+
+        #search-box {
+            width: 100%;
+            height: 50px;
+
+            padding:
+                0
+                17px
+                0
+                45px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.075);
+
+            border-radius: 15px;
+
+            outline: none;
+
+            color: #eeeeF5;
+
+            background:
+                rgba(255, 255, 255, 0.035);
+
+            font-size: 13px;
+
+            transition: 0.2s ease;
+        }
+
+        #search-box::placeholder {
+            color: #5e5e72;
+        }
+
+        #search-box:focus {
+            border-color:
+                rgba(124, 92, 255, 0.5);
+
+            background:
+                rgba(255, 255, 255, 0.05);
+
+            box-shadow:
+                0 0 0 4px
+                rgba(124, 92, 255, 0.07);
+        }
+
+        .search-icon {
+            position: absolute;
+
+            left: 16px;
+            top: 50%;
+
+            width: 17px;
+            height: 17px;
+
+            color: #66667a;
+
+            transform:
+                translateY(-50%);
+
+            pointer-events: none;
+        }
+
+
+        /* =========================================================
+           FILE LIST
+           ========================================================= */
+
+        #file-list {
+            display: flex;
+            flex-direction: column;
+
+            gap: 9px;
+        }
+
+        .file-row {
+            position: relative;
+
+            display: grid;
+
+            grid-template-columns:
+                54px
+                minmax(0, 1fr)
+                auto;
+
+            align-items: center;
+
+            gap: 16px;
+
+            min-height: 76px;
+
+            padding:
+                11px 13px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.055);
+
+            border-radius: 17px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(255, 255, 255, 0.032),
+                    rgba(255, 255, 255, 0.012)
+                );
+
+            transition:
+                0.2s ease;
+        }
+
+        .file-row::before {
+            content: "";
+
+            position: absolute;
+
+            left: 0;
+            top: 13px;
+            bottom: 13px;
+
+            width: 2px;
+
+            border-radius: 2px;
+
+            background:
+                linear-gradient(
+                    to bottom,
+                    #7c5cff,
+                    #00d4ff
+                );
+
+            opacity: 0;
+
+            transition:
+                opacity 0.2s ease;
+        }
+
+        .file-row:hover {
+            transform:
+                translateY(-2px);
+
+            border-color:
+                rgba(124, 92, 255, 0.23);
+
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(124, 92, 255, 0.055),
+                    rgba(0, 212, 255, 0.02)
+                );
+
+            box-shadow:
+                0 12px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        .file-row:hover::before {
+            opacity: 1;
+        }
+
+        .file-type-icon {
+            width: 54px;
+            height: 54px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border:
+                1px solid rgba(124, 92, 255, 0.18);
+
+            border-radius: 14px;
+
+            color: #a99cff;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(124, 92, 255, 0.14),
+                    rgba(124, 92, 255, 0.03)
+                );
+
+            font-size: 10px;
+            font-weight: 850;
+            letter-spacing: 0.7px;
+        }
+
+        .file-type-image {
+            color: #55ddff;
+
+            border-color:
+                rgba(0, 212, 255, 0.18);
+
+            background:
+                rgba(0, 212, 255, 0.065);
+        }
+
+        .file-type-audio {
+            color: #6de7ba;
+
+            border-color:
+                rgba(52, 211, 153, 0.18);
+
+            background:
+                rgba(52, 211, 153, 0.065);
+        }
+
+        .file-type-video {
+            color: #ff9bd4;
+
+            border-color:
+                rgba(244, 114, 182, 0.18);
+
+            background:
+                rgba(244, 114, 182, 0.065);
+        }
+
+        .file-type-other {
+            color: #a0a0ae;
+
+            border-color:
+                rgba(160, 160, 174, 0.14);
+
+            background:
+                rgba(160, 160, 174, 0.04);
+        }
+
+        .file-main {
+            min-width: 0;
+        }
+
+        .file-title-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            min-width: 0;
+        }
+
+        .file-title-line strong {
+            min-width: 0;
+
+            overflow: hidden;
+
+            color: #eeeeF5;
+
+            font-size: 14px;
+            font-weight: 650;
+
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-meta {
+            margin-top: 5px;
+
+            color: #626276;
+
+            font-size: 11.5px;
+        }
+
+        .file-access {
+            margin-top: 5px;
+        }
+
+        .file-integrity {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-top: 7px;
+        }
+
+        .integrity-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+
+            color: #77778c;
+            font-size: 10px;
+        }
+
+        .integrity-status.verified {
+            color: #68ddb8;
+        }
+
+        .integrity-status.unverified {
+            color: #d3a15c;
+        }
+
+        .integrity-dot {
+            width: 5px;
+            height: 5px;
+            flex: 0 0 5px;
+
+            border-radius: 50%;
+
+            background: #77778c;
+        }
+
+        .integrity-status.verified .integrity-dot {
+            background: var(--green);
+
+            box-shadow:
+                0 0 8px rgba(85, 227, 179, 0.7);
+        }
+
+        .integrity-status.unverified .integrity-dot {
+            background: #d3a15c;
+        }
+
+        .integrity-details {
+            min-width: 0;
+        }
+
+        .integrity-details summary {
+            cursor: pointer;
+
+            color: #88889d;
+
+            font-size: 10px;
+
+            user-select: none;
+        }
+
+        .integrity-details summary:hover {
+            color: #b4b4c7;
+        }
+
+        .integrity-hash {
+            display: block;
+
+            max-width: 100%;
+
+            margin-top: 6px;
+            padding: 7px 9px;
+
+            overflow-wrap: anywhere;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.06);
+
+            border-radius: 8px;
+
+            color: #a7a7ba;
+
+            background:
+                rgba(255, 255, 255, 0.025);
+
+            font-family:
+                ui-monospace,
+                SFMono-Regular,
+                Consolas,
+                monospace;
+
+            font-size: 9px;
+            line-height: 1.5;
+        }
+
+        .file-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+
+            color: #707084;
+
+            font-size: 10px;
+        }
+
+        .file-status.shared {
+            color: #68ddb8;
+        }
+
+        .status-dot {
+            width: 5px;
+            height: 5px;
+
+            border-radius: 50%;
+
+            background:
+                var(--green);
+
+            box-shadow:
+                0 0 8px rgba(85, 227, 179, 0.7);
+        }
+
+        .share-badge {
+            display: inline-flex;
+            align-items: center;
+
+            padding: 3px 7px;
+
+            border:
+                1px solid rgba(83, 230, 182, 0.16);
+
+            border-radius: 999px;
+
+            color: #68ddb8;
+
+            background:
+                rgba(83, 230, 182, 0.06);
+
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+        .file-download-count {
+            color: #66667a;
+            font-size: 10px;
+        }
+
+        .share-link-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            max-width: 100%;
+
+            margin-top: 7px;
+        }
+
+        .share-link-text {
+            min-width: 0;
+
+            overflow: hidden;
+
+            color: #77778c;
+
+            font-size: 10px;
+
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .share-copy-btn {
+            flex-shrink: 0;
+
+            padding:
+                5px
+                9px;
+
+            border:
+                1px solid rgba(0, 212, 255, 0.16);
+
+            border-radius: 8px;
+
+            color: #68dfff;
+
+            background:
+                rgba(0, 212, 255, 0.045);
+
+            cursor: pointer;
+
+            font-size: 9px;
+            font-weight: 700;
+
+            transition: 0.18s ease;
+        }
+
+        .share-copy-btn:hover {
+            border-color:
+                rgba(0, 212, 255, 0.35);
+
+            background:
+                rgba(0, 212, 255, 0.08);
+        }
+
+
+        /* =========================================================
+           ACTIONS
+           ========================================================= */
+
+        .file-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .action-btn {
+            width: 37px;
+            height: 37px;
+
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            padding: 0;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.07);
+
+            border-radius: 11px;
+
+            color: #77778b;
+
+            background:
+                rgba(255, 255, 255, 0.025);
+
+            cursor: pointer;
+
+            transition:
+                0.18s ease;
+        }
+
+        .action-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .action-btn:hover {
+            transform:
+                translateY(-1px);
+
+            color: #deddf5;
+
+            border-color:
+                rgba(124, 92, 255, 0.3);
+
+            background:
+                rgba(124, 92, 255, 0.08);
+        }
+
+        .action-share:hover {
+            color: #55ddff;
+
+            border-color:
+                rgba(0, 212, 255, 0.28);
+
+            background:
+                rgba(0, 212, 255, 0.06);
+        }
+
+        .action-delete:hover {
+            color: #ff829d;
+
+            border-color:
+                rgba(255, 95, 130, 0.28);
+
+            background:
+                rgba(255, 95, 130, 0.06);
+        }
+
+        .file-row.is-deleting {
+            opacity: 0.35;
+
+            transform:
+                scale(0.985);
+
+            pointer-events: none;
+        }
+
+
+        /* =========================================================
+           EMPTY / ERROR
+           ========================================================= */
+
+        .empty,
+        .state-panel {
+            min-height: 220px;
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+
+            padding: 30px;
+
+            text-align: center;
+
+            border:
+                1px dashed rgba(255, 255, 255, 0.09);
+
+            border-radius: 18px;
+
+            background:
+                rgba(255, 255, 255, 0.012);
+        }
+
+        .empty-icon,
+        .empty-mark {
+            width: 54px;
+            height: 54px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            margin-bottom: 15px;
+
+            border:
+                1px solid rgba(124, 92, 255, 0.18);
+
+            border-radius: 15px;
+
+            color: #9688ff;
+
+            background:
+                rgba(124, 92, 255, 0.065);
+        }
+
+        .empty-icon svg,
+        .empty-mark svg {
+            width: 23px;
+            height: 23px;
+        }
+
+        .empty > div:last-of-type,
+        .state-panel strong {
+            color: #e9e9f1;
+
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        .empty small,
+        .state-panel span {
+            max-width: 400px;
+
+            margin-top: 7px;
+
+            color: #66667a;
+
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+
+        /* =========================================================
+           TOAST
+           ========================================================= */
+
+        .toast-region {
+            position: fixed;
+
+            right: 25px;
+            bottom: 25px;
+
+            z-index: 9999;
+
+            display: flex;
+            flex-direction: column;
+
+            gap: 9px;
+        }
+
+        .toast {
+            min-width: 260px;
+
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            padding: 13px 16px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.08);
+
+            border-radius: 13px;
+
+            color: #e9e9f2;
+
+            background:
+                rgba(17, 17, 29, 0.95);
+
+            box-shadow:
+                0 15px 40px rgba(0, 0, 0, 0.35);
+
+            backdrop-filter:
+                blur(20px);
+
+            font-size: 12px;
+        }
+
+
+        /* =========================================================
+           SHARE MODAL
+           ========================================================= */
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+
+            z-index: 5000;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            padding: 22px;
+
+            background:
+                rgba(2, 2, 9, 0.76);
+
+            backdrop-filter:
+                blur(14px);
+
+            animation:
+                modalFadeIn 0.18s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal {
+            position: relative;
+
+            width: min(100%, 520px);
+
+            padding: 30px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.09);
+
+            border-radius: 24px;
+
+            background:
+                radial-gradient(
+                    circle at 100% 0%,
+                    rgba(124, 92, 255, 0.12),
+                    transparent 38%
+                ),
+                radial-gradient(
+                    circle at 0% 100%,
+                    rgba(0, 212, 255, 0.06),
+                    transparent 40%
+                ),
+                rgba(12, 12, 24, 0.97);
+
+            box-shadow:
+                0 30px 90px rgba(0, 0, 0, 0.55),
+                0 0 0 1px rgba(124, 92, 255, 0.04);
+
+            backdrop-filter:
+                blur(24px);
+
+            animation:
+                modalSlideUp 0.22s cubic-bezier(
+                    0.16,
+                    1,
+                    0.3,
+                    1
+                );
+        }
+
+        @keyframes modalSlideUp {
+            from {
+                opacity: 0;
+                transform:
+                    translateY(12px)
+                    scale(0.97);
+            }
+
+            to {
+                opacity: 1;
+                transform:
+                    translateY(0)
+                    scale(1);
+            }
+        }
+
+        .modal-close {
+            position: absolute;
+
+            top: 16px;
+            right: 16px;
+
+            width: 34px;
+            height: 34px;
+
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.08);
+
+            border-radius: 10px;
+
+            color: #88889a;
+
+            background:
+                rgba(255, 255, 255, 0.025);
+
+            cursor: pointer;
+
+            font-size: 20px;
+            line-height: 1;
+
+            transition: 0.18s ease;
+        }
+
+        .modal-close:hover {
+            color: #fff;
+
+            border-color:
+                rgba(124, 92, 255, 0.3);
+
+            background:
+                rgba(124, 92, 255, 0.08);
+
+            transform: rotate(90deg);
+        }
+
+        .modal-kicker {
+            margin-bottom: 8px;
+
+            color: #8d82c8;
+
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+        }
+
+        .modal h2 {
+            margin: 0;
+
+            padding-right: 38px;
+
+            color: #f2f2f7;
+
+            font-size: 25px;
+            font-weight: 750;
+            letter-spacing: -0.6px;
+        }
+
+        .modal-sub {
+            margin:
+                8px
+                0
+                24px;
+
+            color: #707084;
+
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+
+        /* =========================================================
+           FORM
+           ========================================================= */
+
+        .form-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    2,
+                    minmax(0, 1fr)
+                );
+
+            gap: 16px;
+        }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+
+            gap: 8px;
+
+            min-width: 0;
+        }
+
+        .form-field.full {
+            grid-column:
+                1 / -1;
+        }
+
+        .form-field > span {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 10px;
+
+            color: #dcdce6;
+
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .form-field > span small {
+            color: #706f83;
+
+            font-size: 9px;
+            font-weight: 600;
+
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-field input {
+            width: 100%;
+            height: 48px;
+
+            padding:
+                0
+                14px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.075);
+
+            border-radius: 12px;
+
+            outline: none;
+
+            color: #eeeeF5;
+
+            background:
+                #151521;
+
+            font-size: 12px;
+
+            transition:
+                border-color 0.2s ease,
+                background 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+        .form-field input::placeholder {
+            color: #66667a;
+        }
+
+        .form-field input:focus {
+            border-color:
+                rgba(124, 92, 255, 0.5);
+
+            background:
+                #181827;
+
+            box-shadow:
+                0 0 0 4px
+                rgba(124, 92, 255, 0.07);
+        }
+
+
+        /* =========================================================
+           CUSTOM DROPDOWN
+           ========================================================= */
+
+        .custom-select {
+            position: relative;
+
+            width: 100%;
+        }
+
+        .custom-select-trigger {
+            width: 100%;
+            height: 48px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 12px;
+
+            padding:
+                0
+                14px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.075);
+
+            border-radius: 12px;
+
+            outline: none;
+
+            color: #eeeeF5;
+
+            background:
+                #151521;
+
+            cursor: pointer;
+
+            text-align: left;
+
+            font-size: 12px;
+            font-weight: 600;
+
+            transition:
+                border-color 0.2s ease,
+                background 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+        .custom-select-trigger:hover {
+            border-color:
+                rgba(124, 92, 255, 0.3);
+
+            background:
+                #181827;
+        }
+
+        .custom-select.open
+        .custom-select-trigger {
+            border-color:
+                rgba(124, 92, 255, 0.55);
+
+            background:
+                #181827;
+
+            box-shadow:
+                0 0 0 4px
+                rgba(124, 92, 255, 0.07);
+        }
+
+        .custom-select-trigger svg {
+            width: 16px;
+            height: 16px;
+
+            flex-shrink: 0;
+
+            color: #9292a7;
+
+            transition:
+                transform 0.2s ease,
+                color 0.2s ease;
+        }
+
+        .custom-select.open
+        .custom-select-trigger svg {
+            transform:
+                rotate(180deg);
+
+            color:
+                #a998ff;
+        }
+
+        .custom-select-menu {
+            position: absolute;
+
+            left: 0;
+            right: 0;
+
+            top:
+                calc(100% + 7px);
+
+            z-index: 100;
+
+            padding: 6px;
+
+            border:
+                1px solid rgba(255, 255, 255, 0.085);
+
+            border-radius: 14px;
+
+            background:
+                rgba(18, 18, 31, 0.98);
+
+            box-shadow:
+                0 18px 45px rgba(0, 0, 0, 0.42),
+                0 0 0 1px
+                rgba(124, 92, 255, 0.035);
+
+            backdrop-filter:
+                blur(18px);
+
+            opacity: 0;
+            visibility: hidden;
+
+            transform:
+                translateY(-8px)
+                scale(0.985);
+
+            transform-origin:
+                top center;
+
+            transition:
+                opacity 0.16s ease,
+                transform 0.16s ease,
+                visibility 0.16s ease;
+        }
+
+        .custom-select.open
+        .custom-select-menu {
+            opacity: 1;
+            visibility: visible;
+
+            transform:
+                translateY(0)
+                scale(1);
+        }
+
+        .custom-select-option {
+            position: relative;
+
+            width: 100%;
+            min-height: 38px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            padding:
+                0
+                11px;
+
+            border: 0;
+            border-radius: 9px;
+
+            color: #a7a7ba;
+
+            background:
+                transparent;
+
+            cursor: pointer;
+
+            text-align: left;
+
+            font-size: 11px;
+            font-weight: 600;
+
+            transition:
+                color 0.15s ease,
+                background 0.15s ease,
+                transform 0.15s ease;
+        }
+
+        .custom-select-option:hover {
+            color: white;
+
+            background:
+                rgba(124, 92, 255, 0.10);
+
+            transform:
+                translateX(2px);
+        }
+
+        .custom-select-option.selected {
+            color: white;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(124, 92, 255, 0.17),
+                    rgba(0, 212, 255, 0.045)
+                );
+        }
+
+        .custom-select-option.selected::after {
+            content: "✓";
+
+            color:
+                #a998ff;
+
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+
+        /* =========================================================
+           SHARE SETTING PREVIEWS
+           ========================================================= */
+
+        .share-expiry-preview,
+        .share-limit-preview {
+            display: flex;
+            align-items: center;
+
+            gap: 6px;
+
+            min-height: 16px;
+
+            margin-top: 2px;
+
+            color: #66667a;
+
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .share-expiry-preview svg,
+        .share-limit-preview svg {
+            width: 12px;
+            height: 12px;
+
+            flex-shrink: 0;
+        }
+
+        .share-expiry-preview svg {
+            color:
+                #8174c9;
+        }
+
+        .share-limit-preview svg {
+            color:
+                #55cdb0;
+        }
+
+
+        /* =========================================================
+           SECURITY NOTE
+           ========================================================= */
+
+        .modal-note {
+            display: flex;
+            align-items: flex-start;
+
+            gap: 10px;
+
+            margin-top: 20px;
+            padding: 13px 14px;
+
+            border:
+                1px solid rgba(124, 92, 255, 0.1);
+
+            border-radius: 13px;
+
+            color: #747489;
+
+            background:
+                rgba(124, 92, 255, 0.035);
+
+            font-size: 10px;
+            line-height: 1.5;
+        }
+
+        .modal-note svg {
+            width: 18px;
+            height: 18px;
+
+            flex: 0 0 auto;
+
+            color: #9184e9;
+        }
+
+
+        /* =========================================================
+           SUBMIT
+           ========================================================= */
+
+        .modal-submit {
+            width: 100%;
+            min-height: 48px;
+
+            margin-top: 18px;
+
+            border: 0;
+            border-radius: 13px;
+
+            color: white;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #7457ff,
+                    #00cfff
+                );
+
+            box-shadow:
+                0 10px 30px
+                rgba(124, 92, 255, 0.16);
+
+            cursor: pointer;
+
+            font-size: 12px;
+            font-weight: 750;
+
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease,
+                filter 0.2s ease;
+        }
+
+        .modal-submit:hover:not(:disabled) {
+            transform:
+                translateY(-1px);
+
+            box-shadow:
+                0 14px 35px
+                rgba(124, 92, 255, 0.22);
+
+            filter:
+                brightness(1.05);
+        }
+
+        .modal-submit:active:not(:disabled) {
+            transform:
+                translateY(0)
+                scale(0.99);
+        }
+
+        .modal-submit:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+
+        /* =========================================================
+           MOBILE
+           ========================================================= */
+
+        @media (max-width: 800px) {
+
+            .navbar {
+                padding:
+                    0
+                    20px;
+            }
+
+            .nav-username {
+                display: none;
+            }
+
+            .main {
+                width:
+                    calc(100% - 28px);
+
+                padding:
+                    30px
+                    0
+                    50px;
+            }
+
+            .dashboard-hero {
+                flex-direction: column;
+                align-items: flex-start;
+
+                padding:
+                    27px;
+            }
+
+            .hero-upload {
+                width: 100%;
+            }
+
+            .stats {
+                grid-template-columns:
+                    1fr;
+            }
+
+            .file-list-section {
+                padding:
+                    22px;
+            }
+
+            .file-list-header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .file-search {
+                width: 100%;
+            }
+        }
+
+
+        @media (max-width: 520px) {
+
+            .logo-text {
+                font-size: 16px;
+                letter-spacing: 1.8px;
+            }
+
+            .logo-icon {
+                width: 39px;
+                height: 39px;
+            }
+
+            .btn-logout {
+                padding:
+                    0
+                    12px;
+            }
+
+            .dashboard-hero {
+                min-height: auto;
+            }
+
+            .hero-title {
+                font-size: 27px;
+            }
+
+            .upload-zone {
+                min-height: 165px;
+
+                padding:
+                    25px
+                    15px;
+            }
+
+            .file-list-section {
+                padding:
+                    18px;
+            }
+
+            .file-row {
+                grid-template-columns:
+                    46px
+                    minmax(0, 1fr);
+
+                gap: 12px;
+
+                padding:
+                    11px;
+            }
+
+            .file-type-icon {
+                width: 46px;
+                height: 46px;
+            }
+
+            .file-actions {
+                grid-column: 2;
+
+                justify-content:
+                    flex-start;
+            }
+
+            .toast-region {
+                left: 15px;
+                right: 15px;
+                bottom: 15px;
+            }
+
+            .toast {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .modal {
+                padding:
+                    24px
+                    20px;
+
+                border-radius:
+                    20px;
+            }
+
+            .form-grid {
+                grid-template-columns:
+                    1fr;
+            }
+
+            .form-field.full {
+                grid-column:
+                    auto;
+            }
+
+            .custom-select-menu {
+                max-height: 240px;
+                overflow-y: auto;
+            }
+
+            .modal-backdrop {
+                align-items:
+                    flex-start;
+
+                padding:
+                    18px 14px;
+
+                overflow-y: auto;
+            }
+
+            .modal {
+                margin:
+                    10px
+                    0
+                    20px;
+            }
+        }
+
+    </style>
+
+</head>
+
+<script
+    src="/js/dashboard.js?v=20261006-1700"
+></script>
+
+<script
+    src="/js/sidebar.js?v=20261006-2000"
+></script>
+
+<script
+    src="/js/sidebar-toggle.js?v=20261006-2100"
+></script>
+
+<script
+    src="/js/dashboard.js?v=20261006-1700"
+></script>
+
+<script
+    src="/js/share-modal-fix.js?v=20261007-2300"
+></script>
+
+<body>
+
+
+    <!-- =========================================================
+         NAVBAR
+         ========================================================= -->
+
+    <nav class="navbar">
+
+        <a
+            class="logo"
+            href="/dashboard"
+            aria-label="Cryptiva Dashboard"
+        >
+
+            <div class="logo-icon">
+                🔐
+            </div>
+
+            <span class="logo-text">
+                CRYPTIVA
+            </span>
+
+        </a>
+
+
+        <div class="nav-right">
+
+            <div
+                class="avatar"
+                id="nav-avatar"
+                aria-label="User avatar"
+            >
+                —
+            </div>
+
+            <span
+                class="nav-username"
+                id="nav-username"
+            >
+                Loading...
+            </span>
+
+            <form
+                action="/logout"
+                method="POST"
+                style="display: inline;"
+            >
+
+                <button
+                    class="btn-logout"
+                    type="submit"
+                >
+                    Sign out
+                </button>
+
+            </form>
+
+        </div>
+
+    </nav>
+
+
+    <!-- =========================================================
+         MAIN
+         ========================================================= -->
+
+    <main class="main">
+
+
+        <!-- HERO -->
+
+        <section class="dashboard-hero">
+
+            <div class="hero-content">
+
+                <div class="hero-badge">
+                    <span class="hero-dot"></span>
+                    SECURE VAULT
+                </div>
+
+                <h1 class="hero-title">
+                    Good to see you,
+                    <span>there.</span>
+                </h1>
+
+                <p class="hero-subtitle">
+                    Store, protect and share your files
+                    with controlled access.
+                </p>
+
+            </div>
+
+
+            <div class="hero-actions">
+
+                <button
+                    type="button"
+                    class="hero-upload"
+                    id="hero-upload-btn"
+                >
+                    Upload files
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- STATISTICS -->
+
+        <section class="stats">
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    Total Files
+                </div>
+
+                <div
+                    class="stat-val accent"
+                    id="stat-files"
+                >
+                    —
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    Storage Used
+                </div>
+
+                <div
+                    class="stat-val"
+                    id="stat-size"
+                >
+                    —
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    Shared Files
+                </div>
+
+                <div
+                    class="stat-val success"
+                    id="stat-shared"
+                >
+                    —
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- UPLOAD -->
+
+        <section
+            class="upload-zone"
+            id="drop-zone"
+            aria-label="File upload area"
+        >
+
+            <input
+                type="file"
+                id="file-input"
+                multiple
+            >
+
+            <div class="upload-icon">
+                ☁️
+            </div>
+
+            <h3>
+                Drop files here or click to upload
+            </h3>
+
+            <p>
+                Securely encrypted before storage
+                · Maximum 50 MB per file
+            </p>
+
+            <div
+                class="progress-wrap hidden"
+                id="progress-wrap"
+            >
+
+                <div
+                    class="progress-label"
+                    id="progress-label"
+                >
+                    Uploading…
+                </div>
+
+                <div class="progress-bar">
+
+                    <div
+                        class="progress-fill"
+                        id="progress-fill"
+                    ></div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- FILE VAULT -->
+
+        <section class="file-list-section">
+
+            <div class="file-list-header">
+
+                <div class="file-list-heading">
+
+                    <div class="section-label">
+                        <span class="section-label-dot"></span>
+                        SECURE VAULT
+                    </div>
+
+                    <h2>
+                        Your Files
+                    </h2>
+
+                    <p>
+                        Encrypted files stored in your secure vault
+                    </p>
+
+                </div>
+
+
+                <div class="file-search">
+
+                    <svg
+                        class="search-icon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        aria-hidden="true"
+                    >
+
+                        <circle
+                            cx="11"
+                            cy="11"
+                            r="6.5"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                        />
+
+                        <path
+                            d="m16 16 4 4"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                        />
+
+                    </svg>
+
+                    <input
+                        type="search"
+                        id="search-box"
+                        placeholder="Search files..."
+                        autocomplete="off"
+                        spellcheck="false"
+                        aria-label="Search files"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <div id="file-list">
+
+                <div class="state-panel">
+
+                    <div class="empty-mark">
+
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden="true"
+                        >
+
+                            <path
+                                d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4L13 7.5h4.5A2.5 2.5 0 0 1 20 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-10Z"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                            />
+
+                        </svg>
+
+                    </div>
+
+                    <strong>
+                        Loading your vault…
+                    </strong>
+
+                    <span>
+                        Retrieving your encrypted file metadata.
+                    </span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- =========================================================
+         SHARE MODAL
+         ========================================================= -->
+
+    <div
+        class="modal-backdrop hidden"
+        id="share-modal"
+        role="presentation"
+    >
+
+        <section
+            class="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-title"
+        >
+
+            <button
+                class="modal-close"
+                id="share-close"
+                type="button"
+                aria-label="Close share dialog"
+            >
+                ×
+            </button>
+
+
+            <div class="modal-kicker">
+                Controlled access
+            </div>
+
+            <h2 id="share-title">
+                Create secure share
+            </h2>
+
+            <p
+                class="modal-sub"
+                id="share-file-name"
+            >
+                Configure access before generating a link.
+            </p>
+
+
+            <form id="share-form">
+
+                <div class="form-grid">
+
+
+                    <!-- PASSWORD -->
+
+                    <label class="form-field full">
+
+                        <span>
+                            <span>Password</span>
+                            <small>Required</small>
+                        </span>
+
+                        <input
+                            id="share-password"
+                            type="password"
+                            minlength="8"
+                            maxlength="128"
+                            autocomplete="new-password"
+                            placeholder="Enter a password (8–128 characters)"
+                            required
+                        >
+
+                    </label>
+
+
+                    <!-- EXPIRATION -->
+
+                    <label class="form-field">
+
+                        <span>
+                            Expires in
+                        </span>
+
+
+                        <!--
+                            Hidden input kept for dashboard.js compatibility.
+                        -->
+
+                        <input
+                            type="hidden"
+                            id="share-expiry"
+                            name="expiresInHours"
+                            value="24"
+                        >
+
+
+                        <div
+                            class="custom-select"
+                            id="share-expiry-control"
+                            data-target="share-expiry"
+                        >
+
+                            <button
+                                type="button"
+                                class="custom-select-trigger"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                            >
+
+                                <span class="custom-select-value">
+                                    24 hours
+                                </span>
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    aria-hidden="true"
+                                >
+
+                                    <path
+                                        d="m6 9 6 6 6-6"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    />
+
+                                </svg>
+
+                            </button>
+
+
+                            <div
+                                class="custom-select-menu"
+                                role="listbox"
+                                aria-label="Expiration time"
+                            >
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="1"
+                                    role="option"
+                                >
+                                    1 hour
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="6"
+                                    role="option"
+                                >
+                                    6 hours
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option selected"
+                                    data-value="24"
+                                    role="option"
+                                >
+                                    24 hours
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="72"
+                                    role="option"
+                                >
+                                    3 days
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="168"
+                                    role="option"
+                                >
+                                    7 days
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="720"
+                                    role="option"
+                                >
+                                    30 days
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            class="share-expiry-preview"
+                            id="share-expiry-preview"
+                        >
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                aria-hidden="true"
+                            >
+
+                                <circle
+                                    cx="12"
+                                    cy="12"
+                                    r="8.5"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                />
+
+                                <path
+                                    d="M12 7.5v5l3 2"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                    stroke-linecap="round"
+                                />
+
+                            </svg>
+
+                            <span>
+                                Expires in 24 hours
+                            </span>
+
+                        </div>
+
+                    </label>
+
+
+                    <!-- DOWNLOAD LIMIT -->
+
+                    <label class="form-field">
+
+                        <span>
+                            Maximum downloads
+                        </span>
+
+
+                        <!--
+                            Hidden input kept for dashboard.js compatibility.
+                        -->
+
+                        <input
+                            type="hidden"
+                            id="share-limit"
+                            name="maxDownloads"
+                            value="1"
+                        >
+
+
+                        <div
+                            class="custom-select"
+                            id="share-limit-control"
+                            data-target="share-limit"
+                        >
+
+                            <button
+                                type="button"
+                                class="custom-select-trigger"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                            >
+
+                                <span class="custom-select-value">
+                                    1 download
+                                </span>
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    aria-hidden="true"
+                                >
+
+                                    <path
+                                        d="m6 9 6 6 6-6"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    />
+
+                                </svg>
+
+                            </button>
+
+
+                            <div
+                                class="custom-select-menu"
+                                role="listbox"
+                                aria-label="Maximum downloads"
+                            >
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option selected"
+                                    data-value="1"
+                                    role="option"
+                                >
+                                    1 download
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="5"
+                                    role="option"
+                                >
+                                    5 downloads
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="10"
+                                    role="option"
+                                >
+                                    10 downloads
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="25"
+                                    role="option"
+                                >
+                                    25 downloads
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="50"
+                                    role="option"
+                                >
+                                    50 downloads
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="custom-select-option"
+                                    data-value="100"
+                                    role="option"
+                                >
+                                    100 downloads
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            class="share-limit-preview"
+                            id="share-limit-preview"
+                        >
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                aria-hidden="true"
+                            >
+
+                                <path
+                                    d="M7 8.5h10M7 12h10M7 15.5h6"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                    stroke-linecap="round"
+                                />
+
+                                <rect
+                                    x="4"
+                                    y="4"
+                                    width="16"
+                                    height="16"
+                                    rx="3"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                />
+
+                            </svg>
+
+                            <span>
+                                Link can be downloaded 1 time
+                            </span>
+
+                        </div>
+
+                    </label>
+
+                </div>
+
+
+                <!-- SECURITY NOTE -->
+
+                <div class="modal-note">
+
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        aria-hidden="true"
+                    >
+
+                        <path
+                            d="M12 3.5 19 6v5.4c0 4.5-2.8 7.6-7 9.1-4.2-1.5-7-4.6-7-9.1V6l7-2.5Z"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                        />
+
+                        <path
+                            d="M12 9v4M12 16h.01"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                        />
+
+                    </svg>
+
+                    <span>
+                        The link uses a random access token and
+                        the password is stored as a secure hash.
+                    </span>
+
+                </div>
+
+
+                <button
+                    class="modal-submit"
+                    id="share-submit"
+                    type="submit"
+                >
+                    Generate secure link
+                </button>
+
+            </form>
+
+        </section>
+
+    </div>
+
+
+    <!-- =========================================================
+         TOAST
+         ========================================================= -->
+
+    <div
+        class="toast-region"
+        id="toast-region"
+        aria-live="polite"
+        aria-atomic="true"
+    ></div>
+
+
+    <!-- =========================================================
+         DASHBOARD JS
+         ========================================================= -->
+
+    <script src="/js/dashboard.js?v=20261006-1700"></script>
+
+
+    <!-- =========================================================
+         CUSTOM SHARE DROPDOWNS
+         ========================================================= -->
+
+    <script>
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            () => {
+
+                const controls =
+                    Array.from(
+                        document.querySelectorAll(
+                            ".custom-select"
+                        )
+                    );
+
+                const modal =
+                    document.getElementById(
+                        "share-modal"
+                    );
+
+
+                /* -------------------------------------------------
+                   Close all dropdowns
+                   ------------------------------------------------- */
+
+                function closeAll() {
+
+                    controls.forEach(
+                        control => {
+
+                            control.classList.remove(
+                                "open"
+                            );
+
+                            const trigger =
+                                control.querySelector(
+                                    ".custom-select-trigger"
+                                );
+
+                            if (trigger) {
+
+                                trigger.setAttribute(
+                                    "aria-expanded",
+                                    "false"
+                                );
+
+                            }
+
+                        }
+                    );
+
+                }
+
+
+                /* -------------------------------------------------
+                   Expiry preview
+                   ------------------------------------------------- */
+
+                function updateExpiryPreview(
+                    value
+                ) {
+
+                    const preview =
+                        document.getElementById(
+                            "share-expiry-preview"
+                        );
+
+                    if (!preview) return;
+
+                    const text =
+                        preview.querySelector(
+                            "span"
+                        );
+
+                    const hours =
+                        Number(value);
+
+                    if (
+                        !Number.isFinite(hours) ||
+                        hours <= 0
+                    ) {
+
+                        text.textContent =
+                            "Select an expiration time";
+
+                        return;
+                    }
+
+
+                    const expiresAt =
+                        new Date(
+                            Date.now() +
+                            hours *
+                            60 *
+                            60 *
+                            1000
+                        );
+
+
+                    const formatted =
+                        expiresAt.toLocaleString(
+                            undefined,
+                            {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit"
+                            }
+                        );
+
+
+                    text.textContent =
+                        `Expires ${formatted}`;
+
+                }
+
+
+                /* -------------------------------------------------
+                   Download limit preview
+                   ------------------------------------------------- */
+
+                function updateLimitPreview(
+                    value
+                ) {
+
+                    const preview =
+                        document.getElementById(
+                            "share-limit-preview"
+                        );
+
+                    if (!preview) return;
+
+                    const text =
+                        preview.querySelector(
+                            "span"
+                        );
+
+                    const number =
+                        Number(value);
+
+
+                    text.textContent =
+                        `Link can be downloaded ${number} ${
+                            number === 1
+                                ? "time"
+                                : "times"
+                        }`;
+
+                }
+
+
+                /* -------------------------------------------------
+                   Sync custom control
+                   ------------------------------------------------- */
+
+                function syncControl(
+                    control
+                ) {
+
+                    const target =
+                        document.getElementById(
+                            control.dataset.target
+                        );
+
+                    const valueElement =
+                        control.querySelector(
+                            ".custom-select-value"
+                        );
+
+                    const options =
+                        Array.from(
+                            control.querySelectorAll(
+                                ".custom-select-option"
+                            )
+                        );
+
+
+                    if (
+                        !target ||
+                        !valueElement ||
+                        !options.length
+                    ) {
+                        return;
+                    }
+
+
+                    const selected =
+                        options.find(
+                            option =>
+                                String(
+                                    option.dataset.value
+                                ) ===
+                                String(
+                                    target.value
+                                )
+                        ) ||
+                        options[0];
+
+
+                    target.value =
+                        selected.dataset.value;
+
+
+                    valueElement.textContent =
+                        selected.textContent.trim();
+
+
+                    options.forEach(
+                        option => {
+
+                            const active =
+                                option === selected;
+
+
+                            option.classList.toggle(
+                                "selected",
+                                active
+                            );
+
+
+                            option.setAttribute(
+                                "aria-selected",
+                                active
+                                    ? "true"
+                                    : "false"
+                            );
+
+                        }
+                    );
+
+
+                    if (
+                        target.id ===
+                        "share-expiry"
+                    ) {
+
+                        updateExpiryPreview(
+                            target.value
+                        );
+
+                    }
+
+
+                    if (
+                        target.id ===
+                        "share-limit"
+                    ) {
+
+                        updateLimitPreview(
+                            target.value
+                        );
+
+                    }
+
+                }
+
+
+                /* -------------------------------------------------
+                   Initialise controls
+                   ------------------------------------------------- */
+
+                controls.forEach(
+                    control => {
+
+                        const trigger =
+                            control.querySelector(
+                                ".custom-select-trigger"
+                            );
+
+                        const target =
+                            document.getElementById(
+                                control.dataset.target
+                            );
+
+                        const options =
+                            Array.from(
+                                control.querySelectorAll(
+                                    ".custom-select-option"
+                                )
+                            );
+
+
+                        if (
+                            !trigger ||
+                            !target
+                        ) {
+                            return;
+                        }
+
+
+                        trigger.addEventListener(
+                            "click",
+                            event => {
+
+                                event.preventDefault();
+                                event.stopPropagation();
+
+
+                                const shouldOpen =
+                                    !control.classList.contains(
+                                        "open"
+                                    );
+
+
+                                closeAll();
+
+
+                                if (
+                                    shouldOpen
+                                ) {
+
+                                    control.classList.add(
+                                        "open"
+                                    );
+
+
+                                    trigger.setAttribute(
+                                        "aria-expanded",
+                                        "true"
+                                    );
+
+                                }
+
+                            }
+                        );
+
+
+                        options.forEach(
+                            option => {
+
+                                option.addEventListener(
+                                    "click",
+                                    event => {
+
+                                        event.preventDefault();
+                                        event.stopPropagation();
+
+
+                                        target.value =
+                                            option.dataset.value;
+
+
+                                        syncControl(
+                                            control
+                                        );
+
+
+                                        closeAll();
+
+                                    }
+                                );
+
+                            }
+                        );
+
+
+                        syncControl(
+                            control
+                        );
+
+                    }
+                );
+
+
+                /* -------------------------------------------------
+                   Click outside
+                   ------------------------------------------------- */
+
+                document.addEventListener(
+                    "click",
+                    event => {
+
+                        if (
+                            !event.target.closest(
+                                ".custom-select"
+                            )
+                        ) {
+
+                            closeAll();
+
+                        }
+
+                    }
+                );
+
+
+                /* -------------------------------------------------
+                   Escape
+                   ------------------------------------------------- */
+
+                document.addEventListener(
+                    "keydown",
+                    event => {
+
+                        if (
+                            event.key ===
+                            "Escape"
+                        ) {
+
+                            closeAll();
+
+                        }
+
+                    }
+                );
+
+
+                /* -------------------------------------------------
+                   Sync when dashboard.js opens modal
+                   ------------------------------------------------- */
+
+                if (modal) {
+
+                    const observer =
+                        new MutationObserver(
+                            () => {
+
+                                if (
+                                    !modal.classList.contains(
+                                        "hidden"
+                                    )
+                                ) {
+
+                                    requestAnimationFrame(
+                                        () => {
+
+                                            controls.forEach(
+                                                syncControl
+                                            );
+
+                                        }
+                                    );
+
+                                }
+
+                            }
+                        );
+
+
+                    observer.observe(
+                        modal,
+                        {
+                            attributes: true,
+                            attributeFilter: [
+                                "class"
+                            ]
+                        }
+                    );
+
+                }
+
+            }
+        );
+
+    </script>
+
+
+    <!-- =========================================================
+         USER INFORMATION
+         ========================================================= -->
+
+    <script>
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            async () => {
+
+                try {
+
+                    const response =
+                        await fetch(
+                            "/me",
+                            {
+                                method: "GET",
+
+                                headers: {
+                                    "Accept":
+                                        "application/json"
+                                },
+
+                                credentials:
+                                    "same-origin",
+
+                                cache:
+                                    "no-store"
+                            }
+                        );
+
+
+                    if (!response.ok) {
+                        return;
+                    }
+
+
+                    const data =
+                        await response.json();
+
+
+                    if (
+                        !data ||
+                        !data.user
+                    ) {
+                        return;
+                    }
+
+
+                    const username =
+                        data.user.username ||
+                        "User";
+
+
+                    const usernameElement =
+                        document.getElementById(
+                            "nav-username"
+                        );
+
+                    const avatarElement =
+                        document.getElementById(
+                            "nav-avatar"
+                        );
+
+
+                    if (
+                        usernameElement
+                    ) {
+
+                        usernameElement.textContent =
+                            username;
+
+                    }
+
+
+                    if (
+                        avatarElement
+                    ) {
+
+                        avatarElement.textContent =
+                            username
+                                .charAt(0)
+                                .toUpperCase();
+
+                    }
+
+                } catch (error) {
+
+                    console.error(
+                        "Unable to load user information:",
+                        error
+                    );
+
+                }
+
+            }
+        );
+
+    </script>
+
+
+    <!-- =========================================================
+         HERO UPLOAD BUTTON
+         ========================================================= -->
+
+    <script>
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            () => {
+
+                const heroUpload =
+                    document.getElementById(
+                        "hero-upload-btn"
+                    );
+
+                const fileInput =
+                    document.getElementById(
+                        "file-input"
+                    );
+
+
+                if (
+                    heroUpload &&
+                    fileInput
+                ) {
+
+                    heroUpload.addEventListener(
+                        "click",
+                        () => {
+                            fileInput.click();
+                        }
+                    );
+
+                }
+
+            }
+        );
+
+    </script>
+
+</body>
+
+</html>

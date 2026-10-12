@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="csrf-token"
+        content=""
+    >
+
+    <title>Sign In — Cryptiva</title>
+
+    <link
+        rel="preconnect"
+        href="https://fonts.googleapis.com"
+    >
+
+    <link
+        rel="preconnect"
+        href="https://fonts.gstatic.com"
+        crossorigin
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+    <style>
+
+        :root {
+            --bg: #05050a;
+            --panel: rgba(15, 15, 25, 0.72);
+            --panel-border: rgba(255, 255, 255, 0.09);
+            --text: #f7f7fb;
+            --muted: #9494a7;
+            --purple: #7c5cff;
+            --cyan: #00d4ff;
+            --danger: #ff5d73;
+            --success: #35d49a;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            width: 100%;
+            min-height: 100%;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        body {
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ---------------------------------------------------------
+           Background
+        --------------------------------------------------------- */
+
+        .background {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+            background:
+                radial-gradient(
+                    circle at 15% 20%,
+                    rgba(124, 92, 255, 0.16),
+                    transparent 32%
+                ),
+                radial-gradient(
+                    circle at 85% 75%,
+                    rgba(0, 212, 255, 0.12),
+                    transparent 30%
+                ),
+                #05050a;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.35;
+        }
+
+        .orb-one {
+            width: 280px;
+            height: 280px;
+            top: -100px;
+            left: -80px;
+            background: #6d4aff;
+        }
+
+        .orb-two {
+            width: 320px;
+            height: 320px;
+            right: -120px;
+            bottom: -100px;
+            background: #00b8e6;
+        }
+
+        .grid {
+            position: absolute;
+            inset: 0;
+            opacity: 0.18;
+            background-image:
+                linear-gradient(
+                    rgba(255,255,255,0.035) 1px,
+                    transparent 1px
+                ),
+                linear-gradient(
+                    90deg,
+                    rgba(255,255,255,0.035) 1px,
+                    transparent 1px
+                );
+            background-size: 50px 50px;
+            mask-image: linear-gradient(
+                to bottom,
+                black,
+                transparent 90%
+            );
+        }
+
+        /* ---------------------------------------------------------
+           Layout
+        --------------------------------------------------------- */
+
+        .page {
+            position: relative;
+            z-index: 1;
+
+            min-height: 100vh;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            padding: 32px 20px;
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 460px;
+        }
+
+        /* ---------------------------------------------------------
+           Brand
+        --------------------------------------------------------- */
+
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            gap: 11px;
+
+            margin-bottom: 28px;
+
+            text-decoration: none;
+            color: var(--text);
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 13px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--purple),
+                    var(--cyan)
+                );
+
+            box-shadow:
+                0 0 30px rgba(124, 92, 255, 0.3);
+
+            font-size: 21px;
+        }
+
+        .brand-name {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: 3px;
+        }
+
+        /* ---------------------------------------------------------
+           Card
+        --------------------------------------------------------- */
+
+        .card {
+            position: relative;
+
+            padding: 38px;
+
+            border: 1px solid var(--panel-border);
+
+            border-radius: 28px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(20, 20, 32, 0.88),
+                    rgba(9, 9, 16, 0.76)
+                );
+
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+
+            box-shadow:
+                0 30px 100px rgba(0, 0, 0, 0.45),
+                inset 0 1px 0 rgba(255,255,255,0.04);
+
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+
+            position: absolute;
+
+            top: 0;
+            left: 15%;
+            right: 15%;
+
+            height: 1px;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(124,92,255,0.8),
+                    rgba(0,212,255,0.8),
+                    transparent
+                );
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+
+            padding: 7px 11px;
+
+            border-radius: 999px;
+
+            background: rgba(124, 92, 255, 0.09);
+
+            border: 1px solid rgba(124, 92, 255, 0.16);
+
+            color: #bcb3ff;
+
+            font-size: 11px;
+            font-weight: 600;
+
+            letter-spacing: 0.5px;
+
+            margin-bottom: 18px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+
+            border-radius: 50%;
+
+            background: #45e6aa;
+
+            box-shadow:
+                0 0 10px rgba(69,230,170,0.7);
+        }
+
+        h1 {
+            margin: 0;
+
+            font-size: 32px;
+
+            line-height: 1.15;
+
+            letter-spacing: -1.2px;
+
+            font-weight: 800;
+        }
+
+        .subtitle {
+            margin: 12px 0 30px;
+
+            color: var(--muted);
+
+            font-size: 14px;
+
+            line-height: 1.7;
+        }
+
+        /* ---------------------------------------------------------
+           Flash Messages
+        --------------------------------------------------------- */
+
+        #flash {
+            margin-bottom: 20px;
+        }
+
+        .flash {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+
+            padding: 13px 14px;
+
+            border-radius: 13px;
+
+            font-size: 13px;
+
+            line-height: 1.5;
+        }
+
+        .flash.error {
+            color: #ffb7c1;
+
+            background: rgba(255, 93, 115, 0.09);
+
+            border: 1px solid rgba(255, 93, 115, 0.2);
+        }
+
+        .flash.success {
+            color: #9af1d0;
+
+            background: rgba(53, 212, 154, 0.09);
+
+            border: 1px solid rgba(53, 212, 154, 0.2);
+        }
+
+        /* ---------------------------------------------------------
+           Form
+        --------------------------------------------------------- */
+
+        .field {
+            margin-bottom: 19px;
+        }
+
+        .field label {
+            display: block;
+
+            margin-bottom: 8px;
+
+            color: #d8d8e2;
+
+            font-size: 12px;
+
+            font-weight: 600;
+        }
+
+        .input-wrap {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+
+            left: 15px;
+            top: 50%;
+
+            transform: translateY(-50%);
+
+            color: #737386;
+
+            font-size: 15px;
+
+            pointer-events: none;
+        }
+
+        .field input {
+            width: 100%;
+
+            height: 52px;
+
+            padding:
+                0 46px;
+
+            border-radius: 13px;
+
+            border: 1px solid rgba(255,255,255,0.09);
+
+            outline: none;
+
+            background:
+                rgba(255,255,255,0.035);
+
+            color: #fff;
+
+            font-family: inherit;
+
+            font-size: 14px;
+
+            transition:
+                border-color 0.2s ease,
+                box-shadow 0.2s ease,
+                background 0.2s ease;
+        }
+
+        .field input::placeholder {
+            color: #555566;
+        }
+
+        .field input:hover {
+            border-color: rgba(255,255,255,0.15);
+        }
+
+        .field input:focus {
+            border-color: rgba(124,92,255,0.7);
+
+            background:
+                rgba(124,92,255,0.045);
+
+            box-shadow:
+                0 0 0 4px rgba(124,92,255,0.09),
+                0 0 30px rgba(124,92,255,0.08);
+        }
+
+        .toggle-password {
+            position: absolute;
+
+            right: 13px;
+            top: 50%;
+
+            transform: translateY(-50%);
+
+            border: none;
+
+            background: transparent;
+
+            color: #707083;
+
+            cursor: pointer;
+
+            font-size: 13px;
+
+            padding: 6px;
+        }
+
+        .toggle-password:hover {
+            color: #b8b8c8;
+        }
+
+        /* ---------------------------------------------------------
+           Submit Button
+        --------------------------------------------------------- */
+
+        .btn-login {
+            position: relative;
+
+            width: 100%;
+            height: 53px;
+
+            margin-top: 8px;
+
+            border: none;
+            border-radius: 14px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #7657ff,
+                    #00c9f2
+                );
+
+            color: white;
+
+            font-family: inherit;
+
+            font-size: 14px;
+
+            font-weight: 700;
+
+            cursor: pointer;
+
+            overflow: hidden;
+
+            box-shadow:
+                0 12px 35px rgba(87, 72, 255, 0.22);
+
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease,
+                filter 0.2s ease;
+        }
+
+        .btn-login::before {
+            content: '';
+
+            position: absolute;
+
+            top: 0;
+            left: -100%;
+
+            width: 60%;
+            height: 100%;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255,255,255,0.2),
+                    transparent
+                );
+
+            transform: skewX(-20deg);
+
+            transition: left 0.6s ease;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+
+            filter: brightness(1.05);
+
+            box-shadow:
+                0 16px 45px rgba(87, 72, 255, 0.3);
+        }
+
+        .btn-login:hover::before {
+            left: 140%;
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        /* ---------------------------------------------------------
+           Footer
+        --------------------------------------------------------- */
+
+        .auth-switch {
+            margin-top: 25px;
+
+            text-align: center;
+
+            color: var(--muted);
+
+            font-size: 13px;
+        }
+
+        .auth-switch a {
+            color: #b5abff;
+
+            text-decoration: none;
+
+            font-weight: 600;
+        }
+
+        .auth-switch a:hover {
+            color: #d0caff;
+        }
+
+        .security-note {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            gap: 7px;
+
+            margin-top: 25px;
+
+            color: #686878;
+
+            font-size: 11px;
+        }
+
+        .security-note span {
+            color: #45d9a4;
+        }
+
+        /* ---------------------------------------------------------
+           Responsive
+        --------------------------------------------------------- */
+
+        @media (max-width: 520px) {
+
+            .page {
+                padding: 20px 14px;
+            }
+
+            .card {
+                padding: 28px 22px;
+
+                border-radius: 22px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            .brand {
+                margin-bottom: 20px;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="background">
+    <div class="orb orb-one"></div>
+    <div class="orb orb-two"></div>
+    <div class="grid"></div>
+</div>
+
+
+<main class="page">
+
+    <div class="auth-container">
+
+        <a
+            href="/"
+            class="brand"
+        >
+            <div class="brand-icon">
+                🔐
+            </div>
+
+            <div class="brand-name">
+                CRYPTIVA
+            </div>
+        </a>
+
+
+        <section class="card">
+
+            <div class="eyebrow">
+                <span class="status-dot"></span>
+                Secure access
+            </div>
+
+
+            <h1>
+                Welcome back.
+            </h1>
+
+
+            <p class="subtitle">
+                Sign in to access your encrypted vault
+                and securely manage your files.
+            </p>
+
+
+            <div id="flash"></div>
+
+
+            <form
+                action="/login"
+                method="POST"
+            >
+
+                <div class="field">
+
+                    <label for="username">
+                        Username
+                    </label>
+
+                    <div class="input-wrap">
+
+                        <span class="input-icon">
+                            @
+                        </span>
+
+                        <input
+                            type="text"
+                            id="username"
+                            name="username"
+                            placeholder="your_username"
+                            autocomplete="username"
+                            maxlength="20"
+                            required
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <div class="field">
+
+                    <label for="password">
+                        Password
+                    </label>
+
+                    <div class="input-wrap">
+
+                        <span class="input-icon">
+                            •
+                        </span>
+
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="Enter your password"
+                            autocomplete="current-password"
+                            required
+                        >
+
+                        <button
+                            type="button"
+                            class="toggle-password"
+                            id="toggle-password"
+                            aria-label="Show password"
+                        >
+                            Show
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <button
+                    class="btn-login"
+                    type="submit"
+                >
+                    Sign in to Cryptiva
+                </button>
+
+            </form>
+
+
+            <div class="auth-switch">
+                Don't have an account?
+                <a href="/register">
+                    Create one
+                </a>
+            </div>
+
+
+            <div class="security-note">
+                <span>●</span>
+                Protected by encrypted storage and access controls
+            </div>
+
+        </section>
+
+    </div>
+
+</main>
+
+
+<script>
+
+    /*
+    |--------------------------------------------------------------------------
+    | Flash Messages
+    |--------------------------------------------------------------------------
+    */
+
+    const flash =
+        document.getElementById('flash');
+
+    const err =
+        document.body.dataset.error;
+
+    const ok =
+        document.body.dataset.success;
+
+
+    if (err) {
+
+        flash.innerHTML =
+            `<div class="flash error">
+                <span>⚠</span>
+                <span>${err}</span>
+            </div>`;
+
+    }
+
+
+    if (ok) {
+
+        flash.innerHTML =
+            `<div class="flash success">
+                <span>✓</span>
+                <span>${ok}</span>
+            </div>`;
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Password Visibility
+    |--------------------------------------------------------------------------
+    */
+
+    const password =
+        document.getElementById(
+            'password'
+        );
+
+    const toggle =
+        document.getElementById(
+            'toggle-password'
+        );
+
+
+    toggle.addEventListener(
+        'click',
+        () => {
+
+            const isPassword =
+                password.type === 'password';
+
+
+            password.type =
+                isPassword
+                    ? 'text'
+                    : 'password';
+
+
+            toggle.textContent =
+                isPassword
+                    ? 'Hide'
+                    : 'Show';
+
+
+            toggle.setAttribute(
+                'aria-label',
+                isPassword
+                    ? 'Hide password'
+                    : 'Show password'
+            );
+
+        }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prevent Accidental Double Submission
+    |--------------------------------------------------------------------------
+    */
+
+    const form =
+        document.querySelector(
+            'form[action="/login"]'
+        );
+
+    const button =
+        document.querySelector(
+            '.btn-login'
+        );
+
+
+    form.addEventListener(
+        'submit',
+        () => {
+
+            button.disabled = true;
+
+            button.textContent =
+                'Authenticating…';
+
+            button.style.opacity =
+                '0.75';
+
+            button.style.cursor =
+                'wait';
+
+        }
+    );
+
+</script>
+
+</body>
+</html>

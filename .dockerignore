@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+k8s/cryptiva-secrets.env
+node_modules
+client/node_modules
+client/dist
+.git
+.migration-backup-*
+.sharing-deployment-backup-*
+tmp
+temp
+*.log

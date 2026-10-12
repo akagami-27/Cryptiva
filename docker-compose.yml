@@ -1,0 +1,26 @@
+services:
+  cryptiva:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://127.0.0.1:3000}
+      CLAMSCAN_PATH: /usr/bin/clamscan
+      CLAMAV_DATABASE_PATH: /var/lib/clamav
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 120s

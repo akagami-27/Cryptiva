@@ -1,0 +1,25 @@
+# Environment secrets
+.env
+.env.*
+!.env.example
+k8s/cryptiva-secrets.env
+
+# Dependencies
+node_modules/
+
+# Local uploaded files
+uploads/
+
+# Local encrypted storage
+encrypted/
+
+# Temporary files
+tmp/
+temp/
+
+# Logs
+*.log
+npm-debug.log*
+# React / Vite frontend
+client/node_modules/
+client/dist/
