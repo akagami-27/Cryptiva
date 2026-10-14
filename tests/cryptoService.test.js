@@ -87,6 +87,56 @@ test('decryption rejects tampered ciphertext', () => {
     });
 });
 
+test('decryption rejects a modified IV with the expected length', () => {
+    const key = generateDataEncryptionKey();
+    const encrypted = encryptData(Buffer.from('Authenticated file data'), key);
+    const modifiedIv = Buffer.from(encrypted.iv);
+    modifiedIv[0] ^= 0x01;
+
+    assert.equal(modifiedIv.length, IV_LENGTH);
+    assert.throws(() => decryptData(
+        encrypted.ciphertext,
+        key,
+        modifiedIv,
+        encrypted.authTag
+    ));
+});
+
+test('decryption rejects a modified authentication tag with the expected length', () => {
+    const key = generateDataEncryptionKey();
+    const encrypted = encryptData(Buffer.from('Authenticated file data'), key);
+    const modifiedAuthTag = Buffer.from(encrypted.authTag);
+    modifiedAuthTag[0] ^= 0x01;
+
+    assert.equal(modifiedAuthTag.length, AUTH_TAG_LENGTH);
+    assert.throws(() => decryptData(
+        encrypted.ciphertext,
+        key,
+        encrypted.iv,
+        modifiedAuthTag
+    ));
+});
+
+test('encryption and decryption round-trip empty and binary Buffers', () => {
+    const key = generateDataEncryptionKey();
+    const inputs = [
+        Buffer.alloc(0),
+        Buffer.from([0x00, 0x01, 0x7f, 0x80, 0xfe, 0xff, 0x00])
+    ];
+
+    for (const plaintext of inputs) {
+        const encrypted = encryptData(plaintext, key);
+        const decrypted = decryptData(
+            encrypted.ciphertext,
+            key,
+            encrypted.iv,
+            encrypted.authTag
+        );
+
+        assert.deepEqual(decrypted, plaintext);
+    }
+});
+
 test('decryption rejects an incorrect key', () => {
     const plaintext = Buffer.from('Secret file contents');
     const key = generateDataEncryptionKey();
@@ -164,6 +214,17 @@ test('data encryption key can be wrapped and unwrapped', () => {
     assert.deepEqual(recoveredKey, originalKey);
 });
 
+test('repeated DEK wrapping uses a fresh IV', () => {
+    const key = generateDataEncryptionKey();
+
+    const first = wrapDataEncryptionKey(key);
+    const second = wrapDataEncryptionKey(key);
+
+    assert.equal(first.keyWrapIv.length, IV_LENGTH);
+    assert.equal(second.keyWrapIv.length, IV_LENGTH);
+    assert.notDeepEqual(first.keyWrapIv, second.keyWrapIv);
+});
+
 test('unwrapping rejects a tampered wrapped key', () => {
     const key = generateDataEncryptionKey();
     const wrapped = wrapDataEncryptionKey(key);
@@ -178,6 +239,88 @@ test('unwrapping rejects a tampered wrapped key', () => {
             wrapped.keyWrapAuthTag
         );
     });
+});
+
+test('unwrapping rejects modified wrapped-key IV and authentication tag', () => {
+    const key = generateDataEncryptionKey();
+    const wrapped = wrapDataEncryptionKey(key);
+    const modifiedIv = Buffer.from(wrapped.keyWrapIv);
+    const modifiedAuthTag = Buffer.from(wrapped.keyWrapAuthTag);
+    modifiedIv[0] ^= 0x01;
+    modifiedAuthTag[0] ^= 0x01;
+
+    assert.throws(() => unwrapDataEncryptionKey(
+        wrapped.wrappedKey,
+        modifiedIv,
+        wrapped.keyWrapAuthTag
+    ));
+    assert.throws(() => unwrapDataEncryptionKey(
+        wrapped.wrappedKey,
+        wrapped.keyWrapIv,
+        modifiedAuthTag
+    ));
+});
+
+test('unwrapping rejects a wrong but correctly sized master key', () => {
+    const key = generateDataEncryptionKey();
+    const wrapped = wrapDataEncryptionKey(key);
+    const previousMasterKey = process.env.MASTER_ENCRYPTION_KEY;
+
+    try {
+        process.env.MASTER_ENCRYPTION_KEY = crypto.randomBytes(KEY_LENGTH).toString('base64');
+
+        assert.throws(() => unwrapDataEncryptionKey(
+            wrapped.wrappedKey,
+            wrapped.keyWrapIv,
+            wrapped.keyWrapAuthTag
+        ));
+    } finally {
+        process.env.MASTER_ENCRYPTION_KEY = previousMasterKey;
+    }
+});
+
+test('wrapping rejects malformed DEK inputs and unwrapping rejects malformed fields', () => {
+    assert.throws(
+        () => wrapDataEncryptionKey(Buffer.alloc(KEY_LENGTH - 1)),
+        /Data Encryption Key must be exactly 32 bytes/
+    );
+    assert.throws(
+        () => wrapDataEncryptionKey(Buffer.alloc(KEY_LENGTH + 1)),
+        /Data Encryption Key must be exactly 32 bytes/
+    );
+    assert.throws(
+        () => wrapDataEncryptionKey('not-a-buffer'),
+        /Data Encryption Key must be exactly 32 bytes/
+    );
+    assert.throws(
+        () => unwrapDataEncryptionKey('not-a-buffer', Buffer.alloc(IV_LENGTH), Buffer.alloc(AUTH_TAG_LENGTH)),
+        /Wrapped key must be a Buffer/
+    );
+    assert.throws(
+        () => unwrapDataEncryptionKey(Buffer.alloc(KEY_LENGTH), Buffer.alloc(IV_LENGTH - 1), Buffer.alloc(AUTH_TAG_LENGTH)),
+        /Invalid key wrapping IV/
+    );
+    assert.throws(
+        () => unwrapDataEncryptionKey(Buffer.alloc(KEY_LENGTH), Buffer.alloc(IV_LENGTH), Buffer.alloc(AUTH_TAG_LENGTH - 1)),
+        /Invalid key wrapping authentication tag/
+    );
+});
+
+test('unwrapping rejects authenticated wrapped data that is not a 32-byte DEK', () => {
+    const masterKey = Buffer.from(TEST_MASTER_KEY, 'base64');
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
+    const malformedWrappedKey = Buffer.concat([
+        cipher.update(Buffer.alloc(KEY_LENGTH - 1)),
+        cipher.final()
+    ]);
+    const authTag = cipher.getAuthTag();
+    masterKey.fill(0);
+
+    assert.throws(
+        () => unwrapDataEncryptionKey(malformedWrappedKey, iv, authTag),
+        /Unwrapped Data Encryption Key has an invalid length/
+    );
 });
 
 test('unwrapping rejects an invalid master key', () => {

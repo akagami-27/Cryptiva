@@ -1,5 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const {
+    getSafeRequestLogUrl,
+    redactLogMessage
+} = require('./safeRequestLog');
 
 function sendErrorPage(res, statusCode) {
     const errorPage = path.join(
@@ -22,11 +26,14 @@ function sendErrorPage(res, statusCode) {
 }
 
 function errorHandler(err, req, res, next) {
+    const { url, sensitiveSegments } = getSafeRequestLogUrl(req);
+    const safeErrorMessage = redactLogMessage(err.message, sensitiveSegments);
+
     console.error('Cryptiva error:', {
         method: req.method,
-        url: req.originalUrl,
+        url,
         status: err.status || err.statusCode || 500,
-        message: err.message
+        message: safeErrorMessage
     });
 
     const statusCode =

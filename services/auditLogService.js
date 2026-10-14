@@ -233,7 +233,7 @@ async function writeAuditLog(
         */
 
         console.error(
-            '[AUDIT] MongoDB insert failed:'
+            '[AUDIT] Persistence or read-back verification failed:'
         );
 
         console.error(

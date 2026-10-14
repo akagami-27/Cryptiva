@@ -129,6 +129,61 @@ test('CSRF middleware rejects POST without a token', () => {
     assert.equal(res.body, 'Forbidden - invalid or missing CSRF token.');
 });
 
+test('CSRF failure logs redact shared-link tokens and omit query strings', async (t) => {
+    for (const routeSuffix of ['', '/download']) {
+        await t.test(routeSuffix || 'share page', () => {
+            const token = 'D'.repeat(43);
+            const captured = [];
+            const originalConsoleWarn = console.warn;
+            console.warn = (message) => captured.push(message);
+
+            try {
+                const req = mockRequest({
+                    method: 'POST',
+                    session: { csrfToken: 'session-value' },
+                    path: `/files/shared/${token}${routeSuffix}?password=query-secret`
+                });
+                requireCsrf(req, mockResponse(), () => {
+                    assert.fail('CSRF validation should fail');
+                });
+            } finally {
+                console.warn = originalConsoleWarn;
+            }
+
+            const logged = captured.join('\n');
+            assert.equal(logged.includes(token), false);
+            assert.equal(logged.includes('query-secret'), false);
+            assert.match(logged, /POST \/files\/shared\/\[REDACTED\]/);
+            if (routeSuffix) assert.match(logged, /\/download/);
+        });
+    }
+});
+
+test('CSRF failure logs redact tokens from malformed shared paths and preserve suffix context', () => {
+    const token = 'M'.repeat(43);
+    const captured = [];
+    const originalConsoleWarn = console.warn;
+    console.warn = (message) => captured.push(message);
+
+    try {
+        const req = mockRequest({
+            method: 'POST',
+            session: { csrfToken: 'session-value' },
+            path: `/files/shared/${token}/download/extra?password=query-secret`
+        });
+        requireCsrf(req, mockResponse(), () => {
+            assert.fail('CSRF validation should fail');
+        });
+    } finally {
+        console.warn = originalConsoleWarn;
+    }
+
+    const logged = captured.join('\n');
+    assert.equal(logged.includes(token), false);
+    assert.equal(logged.includes('query-secret'), false);
+    assert.match(logged, /POST \/files\/shared\/\[REDACTED\]\/download\/extra/);
+});
+
 test('CSRF middleware rejects an incorrect token', () => {
     const req = mockRequest({
         method: 'POST',

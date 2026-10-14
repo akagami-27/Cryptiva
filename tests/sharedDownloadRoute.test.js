@@ -65,19 +65,28 @@ function createContext(overrides = {}) {
         shareId,
         token,
         user: { _id: ownerId, status: 'active' },
+        otherUser: { _id: new mongoose.Types.ObjectId(), status: 'active' },
         share,
         file,
         ciphertext: encrypted.ciphertext,
         acquisitions: [],
         settlements: [],
         fileQueries: [],
-        storageDownloads: 0
+        storageDownloads: 0,
+        storageRemovals: 0,
+        fileDeletions: 0,
+        shareDeletions: 0,
+        shareCreations: 0,
+        shareMutations: 0,
+        shareMutationQueries: []
     };
 }
 
 const User = {
     async findById(id) {
-        return String(id) === String(context.user._id) ? context.user : null;
+        if (String(id) === String(context.user._id)) return context.user;
+        if (String(id) === String(context.otherUser._id)) return context.otherUser;
+        return null;
     }
 };
 
@@ -85,17 +94,46 @@ const File = {
     async findOne(filter) {
         context.fileQueries.push(filter);
         return String(filter._id) === String(context.file._id) &&
-            String(filter.ownerId) === String(context.share.ownerId) &&
             String(context.file.ownerId) === String(filter.ownerId) &&
-            filter.lifecycle?.$in?.includes(context.file.lifecycle)
+            (!filter.lifecycle || filter.lifecycle.$in.includes(context.file.lifecycle))
             ? context.file
             : null;
+    },
+    async deleteOne(filter) {
+        if (String(filter._id) === String(context.file._id) &&
+            String(filter.ownerId) === String(context.file.ownerId)) {
+            context.fileDeletions += 1;
+            return { deletedCount: 1 };
+        }
+        return { deletedCount: 0 };
     }
 };
 
 const ShareLink = {
     async findOne(filter) {
-        return filter.tokenHash === context.share.tokenHash ? context.share : null;
+        if (filter.tokenHash) {
+            return filter.tokenHash === context.share.tokenHash ? context.share : null;
+        }
+        return String(filter.fileId) === String(context.share.fileId) &&
+            String(filter.ownerId) === String(context.share.ownerId)
+            ? context.share
+            : null;
+    },
+    async deleteMany(filter) {
+        if (String(filter.fileId) === String(context.file._id) &&
+            String(filter.ownerId) === String(context.file.ownerId)) {
+            context.shareDeletions += 1;
+            return { deletedCount: 1 };
+        }
+        return { deletedCount: 0 };
+    },
+    async deleteOne() {
+        context.shareDeletions += 1;
+        return { deletedCount: 1 };
+    },
+    async create() {
+        context.shareCreations += 1;
+        return context.share;
     },
     async updateOne(filter, pipeline) {
         if (Object.hasOwn(filter, 'activeDownloadReservations.expiresAt')) {
@@ -122,6 +160,18 @@ const ShareLink = {
         return { modifiedCount: 1 };
     },
     async findOneAndUpdate(filter, pipeline) {
+        if (!filter.$or) {
+            context.shareMutationQueries.push(filter);
+            if (String(filter._id) !== String(context.share._id) ||
+                String(filter.ownerId) !== String(context.share.ownerId) ||
+                context.share.revokedAt) {
+                return null;
+            }
+            context.share.revokedAt = new Date();
+            context.shareMutations += 1;
+            return context.share;
+        }
+
         const now = filter.$or.find((condition) => condition.expiresAt)?.expiresAt?.$gt;
         const active = !context.share.revokedAt &&
             (!context.share.expiresAt || context.share.expiresAt > now);
@@ -144,6 +194,10 @@ const supabase = {
                 async download() {
                     context.storageDownloads += 1;
                     return { data: new Blob([context.ciphertext]), error: null };
+                },
+                async remove() {
+                    context.storageRemovals += 1;
+                    return { data: [], error: null };
                 }
             };
         }
@@ -170,6 +224,7 @@ installModuleMock('../config/supabase', supabase);
 installModuleMock('../services/auditLogService', auditLogService);
 
 const router = require('../routes/files');
+const sharedRouter = require('../routes/shared');
 const app = express();
 app.use(express.json());
 app.use((req, res, next) => {
@@ -178,12 +233,17 @@ app.use((req, res, next) => {
     if (req.get('x-test-user') === 'yes') {
         req.session.user = { id: String(context.user._id) };
     }
+    if (req.get('x-test-other-user') === 'yes') {
+        req.session.user = { id: String(context.otherUser._id) };
+    }
     if (req.get('x-test-verified-share') === 'yes') {
         req.session.sharePasswordVerified = {
             tokenHash: context.share.tokenHash,
             shareId: String(context.share._id),
             passwordHash: context.share.passwordHash,
-            expiresAt: Date.now() + 60_000
+            expiresAt: req.get('x-test-verification-expires-now') === 'yes'
+                ? Date.now()
+                : Date.now() + 60_000
         };
     }
 
@@ -240,12 +300,43 @@ app.use((req, res, next) => {
 app.use(ensureCsrfToken);
 app.use(requireCsrf);
 app.use('/files', router);
+app.use('/shared', sharedRouter);
 
 function authenticatedRequest() {
     return request(app)
         .post(`/files/shared/${context.token}/download`)
         .set('x-test-user', 'yes')
         .set('x-csrf-token', 'route-test-csrf');
+}
+
+function ordinaryDownloadRequest() {
+    return request(app)
+        .get(`/files/download/${context.fileId}`)
+        .set('x-test-user', 'yes');
+}
+
+function sharedPageRequest() {
+    return request(app)
+        .get(`/files/shared/${context.token}`)
+        .set('x-test-user', 'yes');
+}
+
+function assertNoFileBytes(response) {
+    assert.ok(response.status >= 400, 'expected a non-success error response');
+    assert.equal(response.headers['content-disposition'], undefined);
+    assert.notEqual(response.headers['content-type']?.split(';')[0], 'application/octet-stream');
+
+    const responseContent = Buffer.isBuffer(response.body)
+        ? response.body
+        : Buffer.from(response.text || JSON.stringify(response.body || {}));
+    assert.ok(responseContent.length > 0, 'expected a non-empty error response');
+    assert.equal(responseContent.includes(plaintext), false);
+    assert.equal(responseContent.includes(plaintext.subarray(0, 12)), false);
+    assert.equal(responseContent.includes(plaintext.subarray(-12)), false);
+    assert.ok(
+        Boolean(response.text || response.body?.error),
+        'expected a textual or JSON error response rather than a file payload'
+    );
 }
 
 function reset(overrides) {
@@ -265,6 +356,110 @@ test('actual shared-download route completes and settles its reservation exactly
         completed: true
     });
     assert.equal(context.share.downloadCount, 1);
+});
+
+test('actual ordinary-download route verifies the plaintext SHA-256 and returns the file', async () => {
+    reset();
+    const response = await ordinaryDownloadRequest().buffer(true);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, plaintext);
+    assert.equal(context.storageDownloads, 1);
+    assert.equal(context.fileQueries.length, 1);
+    assert.equal(String(context.fileQueries[0].ownerId), String(context.user._id));
+});
+
+test('ordinary-download route blocks tampered ciphertext before sending file bytes', async () => {
+    reset();
+    context.ciphertext = Buffer.from(context.ciphertext);
+    context.ciphertext[0] ^= 0x01;
+
+    const response = await ordinaryDownloadRequest();
+
+    assert.equal(response.status, 500);
+    assertNoFileBytes(response);
+    assert.equal(context.storageDownloads, 1);
+});
+
+test('ordinary-download route blocks missing, malformed, and incorrect SHA-256 metadata', async (t) => {
+    const cases = [
+        ['missing', undefined],
+        ['malformed', 'not-a-sha256-digest'],
+        ['valid format but incorrect', '0'.repeat(64)]
+    ];
+
+    for (const [label, digest] of cases) {
+        await t.test(label, async () => {
+            reset();
+            context.file.integrity = digest === undefined ? {} : { sha256: digest };
+
+            const response = await ordinaryDownloadRequest();
+
+            assert.equal(response.status, 500);
+            assertNoFileBytes(response);
+            assert.equal(context.storageDownloads, 1);
+        });
+    }
+});
+
+test('shared-download route blocks tampered ciphertext before acquiring a reservation', async () => {
+    reset();
+    context.ciphertext = Buffer.from(context.ciphertext);
+    context.ciphertext[0] ^= 0x01;
+
+    const response = await authenticatedRequest();
+
+    assert.equal(response.status, 500);
+    assertNoFileBytes(response);
+    assert.equal(context.acquisitions.length, 0);
+    assert.equal(context.settlements.length, 0);
+});
+
+test('shared-download route blocks missing, malformed, and incorrect SHA-256 metadata before reservation', async (t) => {
+    const cases = [
+        ['missing', undefined],
+        ['malformed', 'not-a-sha256-digest'],
+        ['valid format but incorrect', '0'.repeat(64)]
+    ];
+
+    for (const [label, digest] of cases) {
+        await t.test(label, async () => {
+            reset();
+            context.file.integrity = digest === undefined ? {} : { sha256: digest };
+
+            const response = await authenticatedRequest();
+
+            assert.equal(response.status, 500);
+            assertNoFileBytes(response);
+            assert.equal(context.acquisitions.length, 0);
+            assert.equal(context.settlements.length, 0);
+            assert.equal(context.share.downloadCount, 0);
+        });
+    }
+});
+
+test('public shared-file page rejects missing, malformed, and mismatched SHA-256 metadata', async (t) => {
+    const cases = [
+        ['missing', undefined, 'Integrity verification unavailable'],
+        ['malformed', 'not-a-sha256-digest', 'Integrity verification unavailable'],
+        ['valid format but mismatched', '0'.repeat(64), 'Integrity verification failed']
+    ];
+
+    for (const [label, digest, expectedMessage] of cases) {
+        await t.test(label, async () => {
+            reset();
+            context.file.integrity = digest === undefined ? {} : { sha256: digest };
+
+            const response = await sharedPageRequest();
+
+            assert.equal(response.status, 500);
+            assert.match(response.text, new RegExp(expectedMessage));
+            assertNoFileBytes(response);
+            assert.equal(context.storageDownloads, 1);
+            assert.equal(context.acquisitions.length, 0);
+            assert.equal(context.share.downloadCount, 0);
+        });
+    }
 });
 
 test('actual route releases its reservation when response setup throws', async () => {
@@ -402,6 +597,25 @@ test('a request without a valid password-verification session cannot acquire a r
     assert.equal(context.storageDownloads, 0);
 });
 
+test('password verification is rejected at its exact expiry instant', async () => {
+    reset({ share: { passwordHash: 'bcrypt-hash-placeholder' } });
+    const fixedNow = 1_800_000_000_000;
+    const originalNow = Date.now;
+    Date.now = () => fixedNow;
+
+    try {
+        const response = await authenticatedRequest()
+            .set('x-test-verified-share', 'yes')
+            .set('x-test-verification-expires-now', 'yes');
+
+        assert.equal(response.status, 403);
+        assert.equal(context.acquisitions.length, 0);
+        assert.equal(context.storageDownloads, 0);
+    } finally {
+        Date.now = originalNow;
+    }
+});
+
 test('unauthenticated requests cannot download or reserve another user’s shared file', async () => {
     reset();
     const response = await request(app)
@@ -424,6 +638,66 @@ test('the file lookup is constrained to the share owner before reservation', asy
     assert.equal(String(context.fileQueries[0].ownerId), String(context.share.ownerId));
     assert.equal(context.acquisitions.length, 0);
     assert.equal(context.storageDownloads, 0);
+});
+
+test('another authenticated user cannot download an ordinary file by manipulating its ID', async () => {
+    reset();
+    const response = await request(app)
+        .get(`/files/download/${context.fileId}`)
+        .set('x-test-other-user', 'yes');
+
+    assert.equal(response.status, 404);
+    assertNoFileBytes(response);
+    assert.equal(context.fileQueries.length, 1);
+    assert.equal(String(context.fileQueries[0].ownerId), String(context.otherUser._id));
+    assert.equal(context.storageDownloads, 0);
+});
+
+test('another authenticated user cannot delete a file by manipulating its ID', async () => {
+    reset();
+    const response = await request(app)
+        .delete(`/files/${context.fileId}`)
+        .set('x-test-other-user', 'yes')
+        .set('x-csrf-token', 'route-test-csrf');
+
+    assert.equal(response.status, 404);
+    assert.equal(context.fileQueries.length, 1);
+    assert.equal(String(context.fileQueries[0].ownerId), String(context.otherUser._id));
+    assert.equal(context.storageRemovals, 0);
+    assert.equal(context.fileDeletions, 0);
+    assert.equal(context.shareDeletions, 0);
+});
+
+test('another authenticated user cannot create a share for someone else’s file', async () => {
+    reset();
+    const response = await request(app)
+        .post(`/files/share/${context.fileId}`)
+        .set('x-test-other-user', 'yes')
+        .set('x-csrf-token', 'route-test-csrf')
+        .send({
+            ownerId: String(context.ownerId),
+            password: 'test-password-value'
+        });
+
+    assert.equal(response.status, 404);
+    assert.equal(context.fileQueries.length, 1);
+    assert.equal(String(context.fileQueries[0].ownerId), String(context.otherUser._id));
+    assert.equal(context.shareCreations, 0);
+    assert.equal(context.shareMutations, 0);
+});
+
+test('another authenticated user cannot revoke someone else’s share by manipulating its ID', async () => {
+    reset();
+    const response = await request(app)
+        .delete(`/shared/${context.shareId}`)
+        .set('x-test-other-user', 'yes')
+        .set('x-csrf-token', 'route-test-csrf');
+
+    assert.equal(response.status, 404);
+    assert.equal(context.shareMutationQueries.length, 1);
+    assert.equal(String(context.shareMutationQueries[0].ownerId), String(context.otherUser._id));
+    assert.equal(context.shareMutations, 0);
+    assert.equal(context.share.revokedAt, null);
 });
 
 test.after(() => {

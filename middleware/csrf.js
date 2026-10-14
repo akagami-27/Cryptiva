@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { getSafeRequestLogUrl } = require('./safeRequestLog');
 
 const SAFE_METHODS = new Set([
     'GET',
@@ -192,8 +193,10 @@ function csrfError(
     res
 ) {
 
+    const { url } = getSafeRequestLogUrl(req);
+
     console.warn(
-        `CSRF validation failed: ${req.method} ${req.originalUrl}`
+        `CSRF validation failed: ${req.method} ${url}`
     );
 
 

@@ -2522,7 +2522,7 @@ async function verifyPublicSharedFileIntegrity(
         |--------------------------------------------------------------------------
         */
 
-        if (!storedSha256) {
+        if (!/^[a-f0-9]{64}$/i.test(storedSha256)) {
 
             return res.status(500).send(
                 renderPublicSharePage({
@@ -3089,7 +3089,7 @@ router.post(
                     verified.tokenHash !== shareLink.tokenHash ||
                     verified.shareId !== shareLink._id.toString() ||
                     verified.passwordHash !== shareLink.passwordHash ||
-                    verified.expiresAt < Date.now())
+                    verified.expiresAt <= Date.now())
             ) {
                 return res.status(403).send(
                     'Share password verification required.'
@@ -3262,7 +3262,7 @@ router.post(
 
 
                 if (
-                    !storedSha256 ||
+                    !/^[a-f0-9]{64}$/i.test(storedSha256) ||
                     calculatedSha256.toLowerCase() !==
                     storedSha256
                 ) {

@@ -829,6 +829,36 @@ router.post(
 
             /*
             |--------------------------------------------------------------------------
+            | Clear the Browser Cookie Even if Store Invalidation Failed
+            |--------------------------------------------------------------------------
+            |
+            | Clearing this cookie does not prove the session was removed from
+            | the backing store. A retained or copied session ID may still work.
+            |
+            |--------------------------------------------------------------------------
+            */
+
+            res.clearCookie(
+                'cryptiva.sid',
+                {
+                    httpOnly:
+                        true,
+
+                    sameSite:
+                        'lax',
+
+                    secure:
+                        process.env.NODE_ENV ===
+                        'production',
+
+                    path:
+                        '/'
+                }
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
             | Even if session destruction fails,
             | return the user to login.
             |--------------------------------------------------------------------------
