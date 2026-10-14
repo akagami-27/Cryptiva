@@ -16,7 +16,7 @@ Uploads create an `uploading` metadata record before writing the encrypted objec
 
 Share URLs are built from `PUBLIC_APP_URL`, which must be the public-facing origin in production. The application does not construct links from Host or forwarded-host headers. Local development can use `http://127.0.0.1:3000`; production requires the exact HTTPS origin, without a path.
 
-Run the unit suite with `npm test`. MongoDB reservation integration tests run when `MONGODB_TEST_URI` is set; they force a uniquely named test database and remove their test collections. Use a dedicated test MongoDB account/cluster for this variable. Without it, the integration tests are reported as skipped.
+Run the unit suite with `npm test`. MongoDB reservation integration tests run when `MONGODB_TEST_URI` is set; each test uses a uniquely named database and drops that test database during cleanup. Use a dedicated test MongoDB account/cluster with permission to create and drop databases for this variable. Without it, the integration tests are reported as skipped.
 
 ## Storage, sessions, and secrets
 

@@ -19,6 +19,7 @@ const fs = require('fs');
 const getPublicAppUrl = require('./config/publicAppUrl');
 
 const connectMongoDB = require('./config/mongodb');
+const { validateMasterEncryptionKey } = require('./services/cryptoService');
 
 const {
     ensureCsrfToken,
@@ -90,6 +91,13 @@ if (SESSION_SECRET.length < 32) {
 
     process.exit(1);
 
+}
+
+try {
+    validateMasterEncryptionKey();
+} catch (error) {
+    console.error(error.message);
+    process.exit(1);
 }
 
 try {

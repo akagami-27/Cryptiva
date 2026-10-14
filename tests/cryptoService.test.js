@@ -1,4 +1,4 @@
-
+﻿
 'use strict';
 
 const { test } = require('node:test');
@@ -17,6 +17,7 @@ const {
     wrapDataEncryptionKey,
     unwrapDataEncryptionKey,
     calculateSha256,
+    validateMasterEncryptionKey,
     IV_LENGTH,
     KEY_LENGTH,
     AUTH_TAG_LENGTH
@@ -336,10 +337,34 @@ test('unwrapping rejects an invalid master key', () => {
                 crypto.randomBytes(IV_LENGTH),
                 crypto.randomBytes(AUTH_TAG_LENGTH)
             ),
-            /must decode to exactly 32 bytes/
+            /valid Base64 encoding of exactly 32 bytes/
         );
     } finally {
         process.env.MASTER_ENCRYPTION_KEY = original;
+    }
+});
+
+test('startup master-key validation accepts a valid key and rejects missing or malformed values', () => {
+    const original = process.env.MASTER_ENCRYPTION_KEY;
+
+    try {
+        process.env.MASTER_ENCRYPTION_KEY = TEST_MASTER_KEY;
+        assert.doesNotThrow(() => validateMasterEncryptionKey());
+
+        delete process.env.MASTER_ENCRYPTION_KEY;
+        assert.throws(
+            () => validateMasterEncryptionKey(),
+            /MASTER_ENCRYPTION_KEY is not defined/
+        );
+
+        process.env.MASTER_ENCRYPTION_KEY = crypto.randomBytes(16).toString('base64');
+        assert.throws(
+            () => validateMasterEncryptionKey(),
+            /valid Base64 encoding of exactly 32 bytes/
+        );
+    } finally {
+        if (original === undefined) delete process.env.MASTER_ENCRYPTION_KEY;
+        else process.env.MASTER_ENCRYPTION_KEY = original;
     }
 });
 

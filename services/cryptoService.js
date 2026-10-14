@@ -1,3 +1,4 @@
+
 const crypto = require('crypto');
 
 const AES_ALGORITHM = 'aes-256-gcm';
@@ -12,15 +13,36 @@ function getMasterKey() {
         throw new Error('MASTER_ENCRYPTION_KEY is not defined');
     }
 
+    // A 32-byte key has a canonical Base64 representation of 44 characters.
+    const base64Pattern =
+        /^(?:[A-Za-z0-9+/]{4}){10}[A-Za-z0-9+/]{3}=$/;
+
+    if (!base64Pattern.test(encodedKey)) {
+        throw new Error(
+            'MASTER_ENCRYPTION_KEY must be valid Base64 encoding of exactly 32 bytes'
+        );
+    }
+
     const masterKey = Buffer.from(encodedKey, 'base64');
 
-    if (masterKey.length !== KEY_LENGTH) {
+    // Validate both the decoded length and canonical Base64 representation.
+    if (
+        masterKey.length !== KEY_LENGTH ||
+        masterKey.toString('base64') !== encodedKey
+    ) {
+        masterKey.fill(0);
+
         throw new Error(
-            'MASTER_ENCRYPTION_KEY must decode to exactly 32 bytes'
+            'MASTER_ENCRYPTION_KEY must be valid Base64 encoding of exactly 32 bytes'
         );
     }
 
     return masterKey;
+}
+
+function validateMasterEncryptionKey() {
+    const masterKey = getMasterKey();
+    masterKey.fill(0);
 }
 
 /**
@@ -125,30 +147,34 @@ function wrapDataEncryptionKey(dataEncryptionKey) {
     const masterKey = getMasterKey();
     const keyWrapIv = crypto.randomBytes(IV_LENGTH);
 
-    const cipher = crypto.createCipheriv(
-        AES_ALGORITHM,
-        masterKey,
-        keyWrapIv
-    );
-
-    const wrappedKey = Buffer.concat([
-        cipher.update(dataEncryptionKey),
-        cipher.final()
-    ]);
-
-    const keyWrapAuthTag = cipher.getAuthTag();
-
-    if (keyWrapAuthTag.length !== AUTH_TAG_LENGTH) {
-        throw new Error(
-            'Invalid AES-GCM key wrapping authentication tag length'
+    try {
+        const cipher = crypto.createCipheriv(
+            AES_ALGORITHM,
+            masterKey,
+            keyWrapIv
         );
-    }
 
-    return {
-        wrappedKey,
-        keyWrapIv,
-        keyWrapAuthTag
-    };
+        const wrappedKey = Buffer.concat([
+            cipher.update(dataEncryptionKey),
+            cipher.final()
+        ]);
+
+        const keyWrapAuthTag = cipher.getAuthTag();
+
+        if (keyWrapAuthTag.length !== AUTH_TAG_LENGTH) {
+            throw new Error(
+                'Invalid AES-GCM key wrapping authentication tag length'
+            );
+        }
+
+        return {
+            wrappedKey,
+            keyWrapIv,
+            keyWrapAuthTag
+        };
+    } finally {
+        masterKey.fill(0);
+    }
 }
 
 /**
@@ -176,26 +202,32 @@ function unwrapDataEncryptionKey(
 
     const masterKey = getMasterKey();
 
-    const decipher = crypto.createDecipheriv(
-        AES_ALGORITHM,
-        masterKey,
-        keyWrapIv
-    );
-
-    decipher.setAuthTag(keyWrapAuthTag);
-
-    const dataEncryptionKey = Buffer.concat([
-        decipher.update(wrappedKey),
-        decipher.final()
-    ]);
-
-    if (dataEncryptionKey.length !== KEY_LENGTH) {
-        throw new Error(
-            'Unwrapped Data Encryption Key has an invalid length'
+    try {
+        const decipher = crypto.createDecipheriv(
+            AES_ALGORITHM,
+            masterKey,
+            keyWrapIv
         );
-    }
 
-    return dataEncryptionKey;
+        decipher.setAuthTag(keyWrapAuthTag);
+
+        const dataEncryptionKey = Buffer.concat([
+            decipher.update(wrappedKey),
+            decipher.final()
+        ]);
+
+        if (dataEncryptionKey.length !== KEY_LENGTH) {
+            dataEncryptionKey.fill(0);
+
+            throw new Error(
+                'Unwrapped Data Encryption Key has an invalid length'
+            );
+        }
+
+        return dataEncryptionKey;
+    } finally {
+        masterKey.fill(0);
+    }
 }
 
 /**
@@ -217,6 +249,7 @@ module.exports = {
     IV_LENGTH,
     KEY_LENGTH,
     AUTH_TAG_LENGTH,
+    validateMasterEncryptionKey,
     generateDataEncryptionKey,
     encryptData,
     decryptData,
