@@ -7,8 +7,10 @@ const {
     reserveDownloadSlot,
     settleDownloadReservation,
     renewReservationOrAbort,
-    renewDownloadReservation
+    renewDownloadReservation,
+    runReservedDownloadResponse
 } = require('../services/shareDownloadReservations');
+const { EventEmitter } = require('node:events');
 
 function mockShareLink(maxDownloads = 1) {
     const state = {
@@ -70,6 +72,39 @@ function mockShareLink(maxDownloads = 1) {
         }
     };
     return { model, state };
+}
+
+class MockResponse extends EventEmitter {
+    constructor() {
+        super();
+        this.writableFinished = false;
+        this.destroyed = false;
+        this.headers = {};
+    }
+
+    setHeader(name, value) {
+        this.headers[name] = value;
+    }
+
+    send() {
+        return this;
+    }
+}
+
+async function withReservedResponse(sendResponse, options = {}) {
+    const { model, state } = mockShareLink(1);
+    const reservationId = await reserveDownloadSlot(model, state._id, model.now);
+    assert.ok(reservationId);
+    const res = options.res || new MockResponse();
+    const responsePromise = runReservedDownloadResponse({
+        ShareLink: options.model || model,
+        shareId: state._id,
+        reservationId,
+        res,
+        onCompleted: options.onCompleted,
+        sendResponse: (settle) => sendResponse(res, settle)
+    });
+    return { model, state, reservationId, res, responsePromise };
 }
 
 test('atomic slot claims allow only one concurrent request at a one-download limit', async () => {
@@ -215,4 +250,248 @@ test('renewal rejected for an expired lease destroys the response and settles un
     }
     assert.equal(res.destroyed, true);
     assert.equal(settlementValue, false);
+});
+
+test('an exception after reservation acquisition releases it without counting a download', async () => {
+    const { state, responsePromise } = await withReservedResponse(() => {
+        throw new Error('response preparation failed');
+    });
+
+    await assert.rejects(responsePromise, /response preparation failed/);
+    assert.equal(state.downloadCount, 0);
+    assert.equal(state.activeDownloads, 0);
+});
+
+test('a response setup failure after reservation acquisition releases its slot', async () => {
+    const res = new MockResponse();
+    res.setHeader = () => { throw new Error('header setup failed'); };
+    const { state, responsePromise } = await withReservedResponse((response) => {
+        response.setHeader('Content-Type', 'application/octet-stream');
+        return response.send(Buffer.from('data'));
+    }, { res });
+
+    await assert.rejects(responsePromise, /header setup failed/);
+    assert.equal(state.downloadCount, 0);
+    assert.equal(state.activeDownloads, 0);
+});
+
+test('a response send failure after reservation acquisition releases its slot', async () => {
+    const res = new MockResponse();
+    res.send = () => { throw new Error('send failed'); };
+    const { state, responsePromise } = await withReservedResponse(
+        (response) => response.send(Buffer.from('data')),
+        { res }
+    );
+
+    await assert.rejects(responsePromise, /send failed/);
+    assert.equal(state.downloadCount, 0);
+    assert.equal(state.activeDownloads, 0);
+});
+
+test('close before response completion releases the reservation without counting it', async () => {
+    const { state, res, responsePromise } = await withReservedResponse(
+        (response) => response.send(Buffer.from('data'))
+    );
+    await responsePromise;
+
+    res.emit('close');
+    await Promise.resolve();
+
+    assert.equal(state.downloadCount, 0);
+    assert.equal(state.activeDownloads, 0);
+});
+
+test('finish settles a successful response and increments the counter once', async () => {
+    const { state, res, responsePromise } = await withReservedResponse(
+        (response) => response.send(Buffer.from('data'))
+    );
+    await responsePromise;
+
+    res.writableFinished = true;
+    res.emit('finish');
+    await Promise.resolve();
+
+    assert.equal(state.downloadCount, 1);
+    assert.equal(state.activeDownloads, 0);
+});
+
+test('finish followed by close does not settle or count the reservation twice', async () => {
+    let completedCallbacks = 0;
+    const { state, res, responsePromise } = await withReservedResponse(
+        (response) => response.send(Buffer.from('data')),
+        { onCompleted: () => { completedCallbacks += 1; } }
+    );
+    await responsePromise;
+
+    res.writableFinished = true;
+    res.emit('finish');
+    res.emit('close');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(state.downloadCount, 1);
+    assert.equal(state.activeDownloads, 0);
+    assert.equal(completedCallbacks, 1);
+});
+
+test('settlement failures are logged and the reservation is recovered after its lease expires', async () => {
+    const { model, state, responsePromise } = await withReservedResponse(
+        (response) => response.send(Buffer.from('data'))
+    );
+    const originalUpdateOne = model.updateOne.bind(model);
+    let settlementAttempts = 0;
+    model.updateOne = async (...args) => {
+        settlementAttempts += 1;
+        throw new Error('MongoDB unavailable');
+    };
+
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+        await responsePromise;
+        // A send failure forces the unsuccessful settlement attempt.
+        const res = new MockResponse();
+        const reservationId = state.activeDownloadReservations[0].id;
+        res.send = () => { throw new Error('send failed'); };
+        await assert.rejects(runReservedDownloadResponse({
+            ShareLink: model,
+            shareId: state._id,
+            reservationId,
+            res,
+            sendResponse: () => res.send()
+        }), /send failed/);
+    } finally {
+        console.error = originalError;
+    }
+
+    assert.ok(errors.some((args) => String(args[0]).includes('Could not finalize')));
+    assert.equal(settlementAttempts, 3);
+    assert.equal(state.downloadCount, 0);
+    assert.equal(state.activeDownloads, 1);
+
+    model.updateOne = originalUpdateOne;
+    model.now = new Date(model.now.getTime() + RESERVATION_LEASE_MS + 1);
+    const replacement = await reserveDownloadSlot(model, state._id, model.now);
+    assert.ok(replacement);
+    assert.equal(state.activeDownloads, 1);
+    assert.equal(state.downloadCount, 0);
+});
+
+test('transient settlement failures retry the same reservation ID and then succeed', async () => {
+    const { model, state } = mockShareLink(1);
+    const reservationId = await reserveDownloadSlot(model, state._id, model.now);
+    const originalUpdateOne = model.updateOne.bind(model);
+    const attemptedIds = [];
+    let failuresRemaining = 2;
+    model.updateOne = async (filter, ...args) => {
+        attemptedIds.push(filter['activeDownloadReservations.id']);
+        if (failuresRemaining > 0) {
+            failuresRemaining -= 1;
+            throw new Error('temporary MongoDB failure');
+        }
+        return originalUpdateOne(filter, ...args);
+    };
+
+    await runReservedDownloadResponse({
+        ShareLink: model,
+        shareId: state._id,
+        reservationId,
+        res: new MockResponse(),
+        sendResponse: (settle) => settle(true)
+    });
+
+    assert.deepEqual(attemptedIds, [reservationId, reservationId, reservationId]);
+    assert.equal(state.downloadCount, 1);
+    assert.equal(state.activeDownloads, 0);
+});
+
+test('exhausted settlement retries log failure and leave lease expiry recovery available', async () => {
+    const { model, state } = mockShareLink(1);
+    const reservationId = await reserveDownloadSlot(model, state._id, model.now);
+    const originalUpdateOne = model.updateOne.bind(model);
+    let attempts = 0;
+    model.updateOne = async (filter) => {
+        attempts += 1;
+        assert.equal(filter._id, state._id);
+        assert.equal(filter['activeDownloadReservations.id'], reservationId);
+        throw new Error('MongoDB unavailable');
+    };
+
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+        await runReservedDownloadResponse({
+            ShareLink: model,
+            shareId: state._id,
+            reservationId,
+            res: new MockResponse(),
+            sendResponse: (settle) => settle(false)
+        });
+    } finally {
+        console.error = originalError;
+    }
+
+    assert.equal(attempts, 3);
+    assert.ok(errors.some((args) => String(args[0]).includes('Could not finalize')));
+    assert.equal(state.downloadCount, 0);
+    assert.equal(state.activeDownloads, 1);
+
+    model.updateOne = originalUpdateOne;
+    model.now = new Date(model.now.getTime() + RESERVATION_LEASE_MS + 1);
+    const replacement = await reserveDownloadSlot(model, state._id, model.now);
+    assert.ok(replacement);
+    assert.equal(state.activeDownloads, 1);
+    assert.equal(state.downloadCount, 0);
+});
+
+test('retry after a lost settlement acknowledgement cannot increment twice', async () => {
+    const { model, state } = mockShareLink(1);
+    const reservationId = await reserveDownloadSlot(model, state._id, model.now);
+    const originalUpdateOne = model.updateOne.bind(model);
+    let attempts = 0;
+    const attemptedIds = [];
+    model.updateOne = async (filter, ...args) => {
+        attempts += 1;
+        attemptedIds.push(filter['activeDownloadReservations.id']);
+        const result = await originalUpdateOne(filter, ...args);
+        if (attempts === 1) throw new Error('acknowledgement lost after write');
+        return result;
+    };
+
+    await runReservedDownloadResponse({
+        ShareLink: model,
+        shareId: state._id,
+        reservationId,
+        res: new MockResponse(),
+        sendResponse: (settle) => settle(true)
+    });
+
+    assert.equal(attempts, 2);
+    assert.deepEqual(attemptedIds, [reservationId, reservationId]);
+    assert.equal(state.downloadCount, 1);
+    assert.equal(state.activeDownloads, 0);
+});
+
+test('close and finish during retries share one lifecycle settlement sequence', async () => {
+    const { model, state, res, responsePromise } = await withReservedResponse(
+        (response) => response.send(Buffer.from('data'))
+    );
+    const originalUpdateOne = model.updateOne.bind(model);
+    let attempts = 0;
+    model.updateOne = async (...args) => {
+        attempts += 1;
+        if (attempts < 3) throw new Error('temporary MongoDB failure');
+        return originalUpdateOne(...args);
+    };
+
+    await responsePromise;
+    res.emit('close');
+    res.writableFinished = true;
+    res.emit('finish');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    assert.equal(attempts, 3);
+    assert.equal(state.downloadCount, 0);
+    assert.equal(state.activeDownloads, 0);
 });

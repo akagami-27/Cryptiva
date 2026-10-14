@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 
 const RESERVATION_LEASE_MS = 2 * 60 * 1000;
+const SETTLEMENT_RETRY_DELAYS_MS = [50, 100];
 
 function liveReservationsExpression(now) {
     return {
@@ -148,11 +149,106 @@ async function settleDownloadReservation(ShareLink, shareId, reservationId, comp
     return result.modifiedCount > 0;
 }
 
+async function settleDownloadReservationWithRetry(
+    ShareLink,
+    shareId,
+    reservationId,
+    completed
+) {
+    let lastError;
+    for (let attempt = 0; attempt <= SETTLEMENT_RETRY_DELAYS_MS.length; attempt += 1) {
+        try {
+            return await settleDownloadReservation(
+                ShareLink,
+                shareId,
+                reservationId,
+                completed
+            );
+        } catch (error) {
+            lastError = error;
+            if (attempt === SETTLEMENT_RETRY_DELAYS_MS.length) break;
+            await new Promise((resolve) => {
+                setTimeout(resolve, SETTLEMENT_RETRY_DELAYS_MS[attempt]);
+            });
+        }
+    }
+
+    throw lastError;
+}
+
+async function runReservedDownloadResponse({
+    ShareLink,
+    shareId,
+    reservationId,
+    res,
+    sendResponse,
+    onCompleted
+}) {
+    let settled = false;
+    let heartbeat = null;
+    const settle = async (completed) => {
+        if (settled) return false;
+        settled = true;
+        if (heartbeat) clearInterval(heartbeat);
+
+        try {
+            // The settled latch above prevents lifecycle events from starting
+            // competing retry sequences. Every retry retains the reservation ID.
+            const settledReservation = await settleDownloadReservationWithRetry(
+                ShareLink,
+                shareId,
+                reservationId,
+                completed
+            );
+            if (completed && !settledReservation) {
+                console.warn('Completed shared response had an expired reservation:', {
+                    shareId: String(shareId),
+                    reservationId
+                });
+            }
+        } catch (settlementError) {
+            // If all attempts fail, lease expiry remains the recovery path;
+            // a completed response may then remain absent from downloadCount.
+            console.error('Could not finalize shared download reservation:', {
+                shareId: String(shareId),
+                reservationId,
+                completed,
+                error: settlementError.message
+            });
+        }
+
+        if (completed && onCompleted) {
+            try {
+                onCompleted();
+            } catch (callbackError) {
+                console.error('Shared download completion callback failed:', {
+                    shareId: String(shareId),
+                    reservationId,
+                    error: callbackError.message
+                });
+            }
+        }
+        return true;
+    };
+
+    try {
+        res.once('finish', () => { void settle(true); });
+        res.once('close', () => {
+            if (!res.writableFinished) void settle(false);
+        });
+        return await sendResponse(settle, (interval) => { heartbeat = interval; });
+    } catch (error) {
+        await settle(false);
+        throw error;
+    }
+}
+
 module.exports = {
     RESERVATION_LEASE_MS,
     pruneExpiredDownloadReservations,
     reserveDownloadSlot,
     renewDownloadReservation,
     renewReservationOrAbort,
-    settleDownloadReservation
+    settleDownloadReservation,
+    runReservedDownloadResponse
 };

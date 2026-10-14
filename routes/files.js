@@ -24,7 +24,7 @@ const {
     RESERVATION_LEASE_MS,
     reserveDownloadSlot,
     renewReservationOrAbort,
-    settleDownloadReservation
+    runReservedDownloadResponse
 } = require('../services/shareDownloadReservations');
 
 const {
@@ -3477,65 +3477,12 @@ async function downloadPublicSharedFile(
             );
         }
 
-        res.setHeader('Cache-Control', 'no-store');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Referrer-Policy', 'no-referrer');
-        res.setHeader('Content-Type', file.mimeType);
-        res.setHeader('Content-Length', plaintext.length);
-        const encodedFilename = encodeURIComponent(file.originalName);
-        res.setHeader(
-            'Content-Disposition',
-            `attachment; filename*=UTF-8''${encodedFilename}`
-        );
-
-        // Keep the response buffer intact until Node finishes writing it.
-        const responseBody = Buffer.from(plaintext);
-        const clearResponseBody = () => {
-            responseBody.fill(0);
-            res.off('finish', clearResponseBody);
-            res.off('close', clearResponseBody);
-        };
-        let settled = false;
-        let renewalInProgress = false;
-        const heartbeat = setInterval(() => {
-            if (settled || renewalInProgress) return;
-            renewalInProgress = true;
-            void renewReservationOrAbort(
-                ShareLink,
-                shareLink._id,
-                reservationId,
-                res,
-                settle
-            ).finally(() => {
-                renewalInProgress = false;
-            });
-        }, Math.floor(RESERVATION_LEASE_MS / 3));
-        heartbeat.unref?.();
-        const settle = async (completed) => {
-            if (settled) return;
-            settled = true;
-            clearInterval(heartbeat);
-            try {
-                const settledReservation = await settleDownloadReservation(
-                    ShareLink,
-                    shareLink._id,
-                    reservationId,
-                    completed
-                );
-                if (completed && !settledReservation) {
-                    console.warn('Completed shared response had an expired reservation:', {
-                        shareId: shareLink._id.toString(),
-                        reservationId
-                    });
-                }
-            } catch (counterError) {
-                console.error('Could not finalize shared download reservation:', {
-                    shareId: shareLink._id.toString(),
-                    completed,
-                    error: counterError.message
-                });
-            }
-            if (completed) {
+        return await runReservedDownloadResponse({
+            ShareLink,
+            shareId: shareLink._id,
+            reservationId,
+            res,
+            onCompleted: () => {
                 void logShareDownload(req, shareLink, file).catch((auditError) => {
                     console.error('Shared download audit log failed:', {
                         shareId: shareLink._id.toString(),
@@ -3543,13 +3490,47 @@ async function downloadPublicSharedFile(
                         error: auditError.message
                     });
                 });
+            },
+            sendResponse: async (settle, setHeartbeat) => {
+                res.setHeader('Cache-Control', 'no-store');
+                res.setHeader('Pragma', 'no-cache');
+                res.setHeader('Referrer-Policy', 'no-referrer');
+                res.setHeader('Content-Type', file.mimeType);
+                res.setHeader('Content-Length', plaintext.length);
+                const encodedFilename = encodeURIComponent(file.originalName);
+                res.setHeader(
+                    'Content-Disposition',
+                    `attachment; filename*=UTF-8''${encodedFilename}`
+                );
+
+                // Keep the response buffer intact until Node finishes writing it.
+                const responseBody = Buffer.from(plaintext);
+                const clearResponseBody = () => {
+                    responseBody.fill(0);
+                    res.off('finish', clearResponseBody);
+                    res.off('close', clearResponseBody);
+                };
+                let renewalInProgress = false;
+                const heartbeat = setInterval(() => {
+                    if (renewalInProgress) return;
+                    renewalInProgress = true;
+                    void renewReservationOrAbort(
+                        ShareLink,
+                        shareLink._id,
+                        reservationId,
+                        res,
+                        settle
+                    ).finally(() => {
+                        renewalInProgress = false;
+                    });
+                }, Math.floor(RESERVATION_LEASE_MS / 3));
+                heartbeat.unref?.();
+                setHeartbeat(heartbeat);
+                res.once('finish', clearResponseBody);
+                res.once('close', clearResponseBody);
+                return res.send(responseBody);
             }
-        };
-        res.once('finish', clearResponseBody);
-        res.once('close', clearResponseBody);
-        res.once('finish', () => { void settle(true); });
-        res.once('close', () => { if (!res.writableFinished) void settle(false); });
-        return res.send(responseBody);
+        });
     } catch (error) {
         console.error('Public shared file download failed:', error.message);
         return res.status(500).send(
