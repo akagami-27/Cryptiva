@@ -1,4 +1,4 @@
-﻿# Backend Security Verification â€” FYP Draft
+# Backend Security Verification â€” FYP Draft
 
 **Project:** Cryptiva Secure File Sharing System
 **Draft date:** 15 October 2026
@@ -151,4 +151,3 @@ test. No production-grade security claim should be inferred from these results.
    external service secrets through the intended deployment platform.
 4. Perform manual checks against a non-production deployment and record the
    results separately from local mock-based tests.
-
