@@ -21,6 +21,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ['active', 'disabled'],
       default: 'active'
+    },
+
+    authTokenVersion: {
+      type: Number,
+      default: 0,
+      min: 0
     }
   },
   {

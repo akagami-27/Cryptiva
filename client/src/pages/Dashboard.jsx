@@ -1,5 +1,7 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "../components/AppShell";
+import FileIntegrityDisclosure from "../components/FileIntegrityDisclosure";
+import { parseShareLimit } from "../utils/shareLimit";
 import "../styles/dashboard.css";
 
 const API = {
@@ -90,41 +92,31 @@ export default function Dashboard() {
   const [files, setFiles] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState(null);
   const [shareFile, setShareFile] = useState(null);
   const [sharePassword, setSharePassword] = useState("");
   const [shareExpiry, setShareExpiry] = useState("24");
   const [shareLimit, setShareLimit] = useState("1");
   const [sharing, setSharing] = useState(false);
-  const [hashCopyState, setHashCopyState] = useState({});
+  const [dragActive, setDragActive] = useState(false);
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
 
   const fileInputRef = useRef(null);
   const toastTimer = useRef(null);
 
-  const notify = useCallback((message) => {
-    setToast(message);
+  const notify = useCallback((message, type = "success") => {
+    setToast({ message, type });
     window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(""), 3500);
+    toastTimer.current = window.setTimeout(() => setToast(null), 3500);
   }, []);
 
-  async function copyFileHash(file) {
-    const id = getFileId(file);
-    const hash = file.integrity?.sha256 || file.sha256;
-    if (!id || !hash || file.integrity?.verified !== true) return;
-
-    setHashCopyState((current) => ({ ...current, [id]: "copying" }));
-    try {
-      await navigator.clipboard.writeText(hash);
-      setHashCopyState((current) => ({ ...current, [id]: "copied" }));
-    } catch {
-      setHashCopyState((current) => ({ ...current, [id]: "error" }));
-    }
-  }
-
   const loadData = useCallback(async () => {
+    setRefreshing(true);
     try {
       const [me, result] = await Promise.all([
         apiRequest(API.me),
@@ -140,10 +132,13 @@ export default function Dashboard() {
       }
 
       setError("");
+      setLoadFailed(false);
     } catch (err) {
       setError(err.message || "Unable to load your vault.");
+      setLoadFailed(true);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -166,13 +161,13 @@ export default function Dashboard() {
     0
   );
 
-  const sharedCount = files.filter(
-    (file) => file.isShared || file.shareToken || file.shared
-  ).length;
+  // `/files/data` exposes this server-derived flag for each file.
+  const sharedCount = files.filter((file) => file.hasActiveShare).length;
 
   async function handleUpload(selectedFiles) {
     if (!selectedFiles?.length) return;
 
+    let uploadedCount = 0;
     setUploading(true);
     setUploadProgress(0);
     setError("");
@@ -219,12 +214,17 @@ export default function Dashboard() {
           xhr.onabort = () => reject(new Error("Upload cancelled."));
           xhr.send(formData);
         });
+        uploadedCount += 1;
       }
 
       notify("Upload completed successfully.");
       await loadData();
     } catch (err) {
-      setError(err.message || "Upload failed.");
+      const uploadError = err.message || "Upload could not be completed.";
+      await loadData();
+      setError(uploadedCount > 0
+        ? `${uploadedCount} file${uploadedCount === 1 ? " was" : "s were"} uploaded before the batch stopped. ${uploadError}`
+        : uploadError);
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -237,7 +237,7 @@ export default function Dashboard() {
 
   async function handleDownload(file) {
     const id = getFileId(file);
-    if (!id) return notify("File ID is missing.");
+    if (!id) return notify("File ID is missing.", "error");
 
     try {
       const response = await fetch(
@@ -262,13 +262,13 @@ export default function Dashboard() {
 
       notify("Download started.");
     } catch (err) {
-      notify(err.message || "Download failed.");
+      notify(err.message || "Download failed.", "error");
     }
   }
 
   async function handleDelete(file) {
     const id = getFileId(file);
-    if (!id) return notify("File ID is missing.");
+    if (!id) return notify("File ID is missing.", "error");
 
     if (!window.confirm(`Delete "${getFileName(file)}"? This cannot be undone.`)) {
       return;
@@ -282,7 +282,7 @@ export default function Dashboard() {
       setFiles((current) => current.filter((item) => getFileId(item) !== id));
       notify("File deleted.");
     } catch (err) {
-      notify(err.message || "Unable to delete file.");
+      notify(err.message || "Unable to delete file.", "error");
     }
   }
 
@@ -292,7 +292,14 @@ export default function Dashboard() {
     if (!shareFile) return;
 
     if (sharePassword.length < 8 || sharePassword.length > 128) {
-      return notify("Password must be 8â€“128 characters.");
+      return notify("Password must be 8–128 characters.", "error");
+    }
+
+    let maxDownloads;
+    try {
+      maxDownloads = parseShareLimit(shareLimit);
+    } catch (err) {
+      return notify(err.message, "error");
     }
 
     const id = getFileId(shareFile);
@@ -307,7 +314,7 @@ export default function Dashboard() {
           body: JSON.stringify({
             password: sharePassword,
             expiresInHours: Number(shareExpiry),
-            maxDownloads: Number(shareLimit),
+            maxDownloads,
           }),
         }
       );
@@ -332,26 +339,67 @@ export default function Dashboard() {
       setSharePassword("");
       await loadData();
     } catch (err) {
-      notify(err.message || "Unable to create secure share.");
+      notify(err.message || "Unable to create secure share.", "error");
     } finally {
       setSharing(false);
     }
   }
 
+  function handlePageDragEnter(event) {
+    if (!Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+    event.preventDefault();
+    setDragActive(true);
+    setDragPosition({ x: event.clientX, y: event.clientY });
+  }
+
+  function handlePageDragOver(event) {
+    if (!Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = uploading ? "none" : "copy";
+    setDragPosition({ x: event.clientX, y: event.clientY });
+  }
+
+  function handlePageDragLeave(event) {
+    if (event.relatedTarget && event.currentTarget.contains(event.relatedTarget)) return;
+    setDragActive(false);
+  }
+
+  function handlePageDrop(event) {
+    if (!event.dataTransfer?.files?.length) {
+      setDragActive(false);
+      return;
+    }
+    event.preventDefault();
+    setDragActive(false);
+    if (!uploading) handleUpload(Array.from(event.dataTransfer.files));
+  }
+
   return (
-    <AppShell username={username} className="dashboard-page" contentClassName="dashboard-main">
+    <div
+      className={`dashboard-page${dragActive ? " is-file-dragging" : ""}`}
+      onDragEnter={handlePageDragEnter}
+      onDragOver={handlePageDragOver}
+      onDragLeave={handlePageDragLeave}
+      onDrop={handlePageDrop}
+    >
+      <AppShell username={username} className="dashboard-app-shell" contentClassName="dashboard-main">
           <section className="dashboard-hero">
             <div>
               <div className="hero-badge">
                 <span className="hero-dot" />
-                SECURE VAULT
+                YOUR PRIVATE WORKSPACE
               </div>
 
               <h1>
-                Good to see you, <span>{username}</span>
+                Your files, <span>under control.</span>
               </h1>
 
-              <p>Store, protect and share your files with controlled access.</p>
+              <p>Welcome back, {username}. Keep your important files protected, organised and ready to share.</p>
+              <div className="hero-assurances" aria-label="Vault features">
+                <span><i className="assurance-dot assurance-dot--cyan" />Encrypted storage</span>
+                <span><i className="assurance-dot assurance-dot--violet" />Controlled sharing</span>
+                <span><i className="assurance-dot assurance-dot--amber" />Integrity checks</span>
+              </div>
             </div>
 
             <button
@@ -359,24 +407,28 @@ export default function Dashboard() {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
             >
-              {uploading ? "Uploadingâ€¦" : "+ Upload files"}
+              <span className="upload-button-icon" aria-hidden="true">＋</span>
+              {uploading ? "Uploading…" : "Upload files"}
             </button>
           </section>
 
           <section className="dashboard-stats">
             <article className="stat-card">
-              <span>Total Files</span>
-              <strong className="accent">{files.length}</strong>
+              <div className="stat-heading"><span className="stat-symbol stat-symbol--violet">▤</span><span>Total files</span></div>
+              <strong className="accent">{loadFailed && files.length === 0 ? "—" : files.length}</strong>
+              <small>Stored in your vault</small>
             </article>
 
             <article className="stat-card">
-              <span>Storage Used</span>
-              <strong>{formatBytes(totalSize)}</strong>
+              <div className="stat-heading"><span className="stat-symbol stat-symbol--cyan">◫</span><span>Storage used</span></div>
+              <strong>{loadFailed && files.length === 0 ? "—" : formatBytes(totalSize)}</strong>
+              <small>Across all uploaded files</small>
             </article>
 
             <article className="stat-card">
-              <span>Shared Files</span>
-              <strong className="success">{sharedCount}</strong>
+              <div className="stat-heading"><span className="stat-symbol stat-symbol--green">↗</span><span>Shared files</span></div>
+              <strong className="success">{loadFailed && files.length === 0 ? "—" : sharedCount}</strong>
+              <small>With controlled access</small>
             </article>
           </section>
 
@@ -389,61 +441,85 @@ export default function Dashboard() {
           />
 
           <section
-            className="upload-zone"
+            className={`upload-zone${dragActive ? " drag-active" : ""}${uploading ? " is-uploading" : ""}`}
             onClick={() => !uploading && fileInputRef.current?.click()}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.currentTarget.classList.add("drag-active");
-            }}
-            onDragLeave={(event) => {
-              event.currentTarget.classList.remove("drag-active");
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              event.currentTarget.classList.remove("drag-active");
-
-              if (!uploading) {
-                handleUpload(Array.from(event.dataTransfer.files || []));
+            role="button"
+            tabIndex={uploading ? -1 : 0}
+            aria-label="Upload files to your secure vault"
+            onKeyDown={(event) => {
+              if ((event.key === "Enter" || event.key === " ") && !uploading) {
+                event.preventDefault();
+                fileInputRef.current?.click();
               }
             }}
           >
-            <div className="upload-icon">â˜</div>
-            <h3>{uploading ? "Uploading your filesâ€¦" : "Drop files here or click to upload"}</h3>
-            <p>Encrypted file storage Â· Maximum 50 MB per file</p>
-
+            <div className="upload-orbit upload-orbit--one" aria-hidden="true" />
+            <div className="upload-orbit upload-orbit--two" aria-hidden="true" />
+            <div className="upload-center-icon" aria-hidden="true">
+              <span className="upload-cloud">⇧</span>
+              <span className="upload-spark upload-spark--one">✦</span>
+              <span className="upload-spark upload-spark--two">✧</span>
+            </div>
+            <h3>{uploading ? "Securing your files…" : dragActive ? "Release to add to your vault" : "Drop files into your secure vault"}</h3>
+            <p>{uploading ? "Your upload is in progress. Keep this page open." : "Drag and drop anywhere on this page, or browse your device"}</p>
+            <div className="upload-meta"><span>↳ Multiple files supported</span><span>Up to 50 MB per file</span><span>Encrypted storage</span></div>
             {uploading && (
               <div className="upload-progress">
-                <span>{uploadProgress}%</span>
-                <div className="progress-track">
-                  <div style={{ width: `${uploadProgress}%` }} />
-                </div>
+                <div className="progress-copy"><span>Uploading files</span><strong>{uploadProgress}%</strong></div>
+                <div className="progress-track"><div style={{ width: `${uploadProgress}%` }} /></div>
               </div>
             )}
           </section>
-
-          {error && <div className="dashboard-error">{error}</div>}
+          {error && !(loadFailed && files.length === 0) && (
+            <div className="dashboard-error" role="alert">
+              <span>{error}</span>
+              {loadFailed && (
+                <button type="button" onClick={loadData} disabled={refreshing}>
+                  {refreshing ? "Retrying…" : "Retry"}
+                </button>
+              )}
+            </div>
+          )}
 
           <section className="file-section">
             <div className="file-section-header">
               <div>
-                <div className="section-kicker">SECURE VAULT</div>
-                <h2>Your Files</h2>
-                <p>Encrypted files stored in your secure vault</p>
+                <div className="section-kicker">VAULT CONTENTS</div>
+                <h2>Your files <span className="file-count-pill">{loadFailed && files.length === 0 ? "—" : files.length}</span></h2>
+                <p>Everything you’ve stored, in one place.</p>
               </div>
 
               <input
                 className="file-search"
                 type="search"
-                placeholder="Search files..."
+                placeholder="Search your files…"
+                aria-label="Search your files"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
+              <button
+                className="dashboard-refresh-button"
+                type="button"
+                onClick={loadData}
+                disabled={refreshing}
+                aria-label="Refresh vault files"
+              >
+                {refreshing ? "Refreshing…" : "Refresh"}
+              </button>
             </div>
 
             {loading ? (
               <div className="file-state">
-                <strong>Loading your vaultâ€¦</strong>
+                <strong>Loading your vault…</strong>
                 <span>Retrieving your encrypted file metadata.</span>
+              </div>
+            ) : loadFailed && files.length === 0 ? (
+              <div className="file-state" role="alert">
+                <strong>{error || "Your vault could not be loaded."}</strong>
+                <span>Retry the request to check your files.</span>
+                <button type="button" className="dashboard-refresh-button" onClick={loadData} disabled={refreshing}>
+                  {refreshing ? "Retrying…" : "Retry"}
+                </button>
               </div>
             ) : filteredFiles.length === 0 ? (
               <div className="file-state">
@@ -463,47 +539,20 @@ export default function Dashboard() {
 
                   return (
                     <article className="file-row" key={id || name}>
-                      <div className={`file-type-icon type-${type}`}>
-                        {getExtension(name)}
+                      <div className={`file-type-icon type-${type}`} aria-label={`${type} file`}>
+                        <span className="file-type-glyph" aria-hidden="true">{type === "image" ? "▧" : type === "video" ? "▶" : type === "audio" ? "♫" : getExtension(name).slice(0, 3)}</span>
+                        <span className="file-type-extension">{getExtension(name)}</span>
                       </div>
 
                       <div className="file-details">
                         <strong title={name}>{name}</strong>
                         <span>
-                          {formatBytes(file.size)} Â· {file.mimeType || file.mimetype || type}
+                          {formatBytes(file.size)} · {file.mimeType || file.mimetype || type}
                         </span>
 
-                        <details className="file-integrity">
-                          <summary>SHA-256 Hash</summary>
-                          {file.integrity?.verified === true &&
-                          (file.integrity?.sha256 || file.sha256) ? (
-                            <>
-                              <p>Stored file hash (SHA-256)</p>
-                              <code>{file.integrity?.sha256 || file.sha256}</code>
-                              <button
-                                type="button"
-                                className="copy-hash-button"
-                                onClick={() => copyFileHash(file)}
-                                disabled={hashCopyState[id] === "copying"}
-                              >
-                                {hashCopyState[id] === "copying"
-                                  ? "Copying..."
-                                  : hashCopyState[id] === "copied"
-                                    ? "Copied"
-                                    : "Copy Hash"}
-                              </button>
-                              {hashCopyState[id] === "error" && (
-                                <span className="hash-copy-error" role="status">
-                                  Unable to copy hash. Select and copy it manually.
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="hash-copy-error" role="status">
-                              A verified SHA-256 hash is unavailable for this file.
-                            </span>
-                          )}
-                        </details>
+                        <FileIntegrityDisclosure
+                          hash={file.integrity?.sha256 ?? file.sha256 ?? file.hash ?? null}
+                        />
                       </div>
 
                       <div className="file-actions">
@@ -512,7 +561,7 @@ export default function Dashboard() {
                           aria-label={`Download ${name}`}
                           onClick={() => handleDownload(file)}
                         >
-                          â†“
+                          ↓
                         </button>
 
                         <button
@@ -526,7 +575,7 @@ export default function Dashboard() {
                             setShareLimit("1");
                           }}
                         >
-                          â†—
+                          ↗
                         </button>
 
                         <button
@@ -535,7 +584,7 @@ export default function Dashboard() {
                           aria-label={`Delete ${name}`}
                           onClick={() => handleDelete(file)}
                         >
-                          Ã—
+                          ×
                         </button>
                       </div>
                     </article>
@@ -544,7 +593,19 @@ export default function Dashboard() {
               </div>
             )}
           </section>
-      
+      {dragActive && (
+        <div className="drag-cursor-layer" aria-hidden="true">
+          <div className="drag-cursor-core" style={{ left: dragPosition.x, top: dragPosition.y }}>
+            <span className="drag-cursor-ring" />
+            <span className="drag-file-chip drag-file-chip--pdf">PDF</span>
+            <span className="drag-file-chip drag-file-chip--image">IMG</span>
+            <span className="drag-file-chip drag-file-chip--doc">DOC</span>
+            <span className="drag-file-chip drag-file-chip--zip">ZIP</span>
+            <span className="drag-file-chip drag-file-chip--video">MP4</span>
+          </div>
+          <div className="drag-cursor-label" style={{ left: dragPosition.x + 28, top: dragPosition.y + 28 }}>DROP TO UPLOAD</div>
+        </div>
+      )}
 
       {shareFile && (
         <div
@@ -568,7 +629,7 @@ export default function Dashboard() {
               disabled={sharing}
               aria-label="Close dialog"
             >
-              Ã—
+              ×
             </button>
 
             <div className="section-kicker">CONTROLLED ACCESS</div>
@@ -577,7 +638,7 @@ export default function Dashboard() {
 
             <form onSubmit={handleShare}>
               <label className="form-field">
-                <span>Password (8â€“128 characters)</span>
+                <span>Password (8–128 characters)</span>
                 <input
                   type="password"
                   minLength={8}
@@ -608,17 +669,19 @@ export default function Dashboard() {
 
                 <label className="form-field">
                   <span>Maximum downloads</span>
-                  <select
+                  <input
+                    type="number"
+                    min="1"
+                    max="100000"
+                    step="1"
                     value={shareLimit}
                     onChange={(event) => setShareLimit(event.target.value)}
-                  >
-                    <option value="1">1 download</option>
-                    <option value="5">5 downloads</option>
-                    <option value="10">10 downloads</option>
-                    <option value="25">25 downloads</option>
-                    <option value="50">50 downloads</option>
-                    <option value="100">100 downloads</option>
-                  </select>
+                    placeholder="Unlimited"
+                    aria-describedby="dashboard-share-limit-help"
+                  />
+                  <small id="dashboard-share-limit-help">
+                    Enter 1–100000, or leave blank for unlimited downloads.
+                  </small>
                 </label>
               </div>
 
@@ -628,7 +691,7 @@ export default function Dashboard() {
               </div>
 
               <button className="modal-submit" type="submit" disabled={sharing}>
-                {sharing ? "Creating linkâ€¦" : "Generate secure link"}
+                {sharing ? "Creating link…" : "Generate secure link"}
               </button>
             </form>
           </section>
@@ -636,11 +699,11 @@ export default function Dashboard() {
       )}
 
       {toast && (
-        <div className="dashboard-toast" role="status">
-          {toast}
+        <div className={`dashboard-toast ${toast.type}`} role={toast.type === "error" ? "alert" : "status"}>
+          {toast.message}
         </div>
       )}
-    </AppShell>
+      </AppShell>
+    </div>
   );
 }
-

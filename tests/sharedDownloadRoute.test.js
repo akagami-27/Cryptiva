@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const Module = require('node:module');
 const express = require('express');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const request = require('supertest');
 const { ensureCsrfToken, requireCsrf } = require('../middleware/csrf');
 
@@ -15,6 +16,7 @@ const cryptoService = require('../services/cryptoService');
 const plaintext = Buffer.from('Cryptiva route integration fixture');
 
 let context = createContext();
+const rateLimitBuckets = new Map();
 
 function createContext(overrides = {}) {
     const ownerId = new mongoose.Types.ObjectId();
@@ -78,7 +80,8 @@ function createContext(overrides = {}) {
         shareDeletions: 0,
         shareCreations: 0,
         shareMutations: 0,
-        shareMutationQueries: []
+        shareMutationQueries: [],
+        lastSession: null
     };
 }
 
@@ -222,14 +225,28 @@ installModuleMock('../models/file', File);
 installModuleMock('../models/shareLink', ShareLink);
 installModuleMock('../config/supabase', supabase);
 installModuleMock('../services/auditLogService', auditLogService);
+// This suite isolates ownership and download logic beneath the auth boundary;
+// tests/auth.test.js exercises the production JWT middleware itself.
+installModuleMock('../middleware/auth', {
+    requireAuth(req, res, next) {
+        if (!req.session?.user) return res.redirect('/login');
+        req.authUser = req.session.user;
+        return next();
+    },
+    redirectIfAuth(req, res, next) {
+        return req.session?.user ? res.redirect('/dashboard') : next();
+    }
+});
 
 const router = require('../routes/files');
 const sharedRouter = require('../routes/shared');
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => {
     req.flash = () => undefined;
     req.session = { csrfToken: 'route-test-csrf' };
+    context.lastSession = req.session;
     if (req.get('x-test-user') === 'yes') {
         req.session.user = { id: String(context.user._id) };
     }
@@ -238,9 +255,9 @@ app.use((req, res, next) => {
     }
     if (req.get('x-test-verified-share') === 'yes') {
         req.session.sharePasswordVerified = {
-            tokenHash: context.share.tokenHash,
-            shareId: String(context.share._id),
-            passwordHash: context.share.passwordHash,
+            tokenHash: req.get('x-test-verified-token-hash') || context.share.tokenHash,
+            shareId: req.get('x-test-verified-share-id') || String(context.share._id),
+            passwordHash: req.get('x-test-verified-password-hash') || context.share.passwordHash,
             expiresAt: req.get('x-test-verification-expires-now') === 'yes'
                 ? Date.now()
                 : Date.now() + 60_000
@@ -341,6 +358,50 @@ function assertNoFileBytes(response) {
 
 function reset(overrides) {
     context = createContext(overrides);
+}
+
+function installRateLimitCollectionMock(t) {
+    const originalCollection = mongoose.connection.collection;
+    const hadOwnReadyState = Object.hasOwn(mongoose.connection, 'readyState');
+    const originalReadyState = mongoose.connection.readyState;
+
+    mongoose.connection.readyState = 1;
+    mongoose.connection.collection = (name) => {
+        assert.equal(name, 'rateLimitBuckets');
+        return {
+            async createIndex() {},
+            async findOneAndUpdate(filter) {
+                const now = Date.now();
+                const previous = rateLimitBuckets.get(filter.key);
+                const active = previous && previous.resetTime > now;
+                const bucket = {
+                    totalHits: active ? previous.totalHits + 1 : 1,
+                    resetTime: active ? previous.resetTime : new Date(now + 15 * 60 * 1000)
+                };
+                rateLimitBuckets.set(filter.key, bucket);
+                return bucket;
+            },
+            async updateOne(filter) {
+                const previous = rateLimitBuckets.get(filter.key);
+                if (previous) previous.totalHits = Math.max(0, previous.totalHits - 1);
+            }
+        };
+    };
+
+    t.after(() => {
+        mongoose.connection.collection = originalCollection;
+        if (hadOwnReadyState) mongoose.connection.readyState = originalReadyState;
+        else delete mongoose.connection.readyState;
+    });
+}
+
+function sharePasswordRequest(password) {
+    return request(app)
+        .post(`/files/shared/${context.token}`)
+        .set('x-test-user', 'yes')
+        .set('x-csrf-token', 'route-test-csrf')
+        .type('form')
+        .send({ password });
 }
 
 test('actual shared-download route completes and settles its reservation exactly once', async () => {
@@ -613,6 +674,88 @@ test('password verification is rejected at its exact expiry instant', async () =
         assert.equal(context.storageDownloads, 0);
     } finally {
         Date.now = originalNow;
+    }
+});
+
+test('correct share password reaches the integrity confirmation step without reserving a download', async (t) => {
+    installRateLimitCollectionMock(t);
+    rateLimitBuckets.clear();
+    reset({ share: { passwordHash: await bcrypt.hash('correct route password', 4) } });
+
+    const response = await sharePasswordRequest('correct route password');
+
+    assert.equal(response.status, 200);
+    assert.match(response.text, /successfully passed[\s\S]*SHA-256 integrity verification/i);
+    assert.match(response.text, /Download File/);
+    assert.equal(context.lastSession.sharePasswordVerified.tokenHash, context.share.tokenHash);
+    assert.equal(context.lastSession.sharePasswordVerified.shareId, String(context.share._id));
+    assert.equal(context.lastSession.sharePasswordVerified.passwordHash, context.share.passwordHash);
+    assert.equal(context.acquisitions.length, 0);
+    assert.equal(context.share.downloadCount, 0);
+});
+
+test('incorrect share password is rejected without echoing the password or internal details', async (t) => {
+    installRateLimitCollectionMock(t);
+    rateLimitBuckets.clear();
+    const suppliedPassword = 'wrong value must stay private';
+    reset({ share: { passwordHash: await bcrypt.hash('correct route password', 4) } });
+
+    const response = await sharePasswordRequest(suppliedPassword);
+
+    assert.equal(response.status, 401);
+    assert.match(response.text, /password you entered is incorrect/i);
+    assert.equal(response.text.includes(suppliedPassword), false);
+    assert.equal(response.text.includes(context.share.passwordHash), false);
+    assert.equal(response.text.split(context.token).length - 1, 1);
+    assert.ok(response.text.includes(`/files/shared/${context.token}`));
+    assert.doesNotMatch(response.text, /MongoServerError|stack trace|passwordHash|tokenHash/i);
+    assert.equal(context.lastSession.sharePasswordVerified, undefined);
+});
+
+test('repeated incorrect share passwords hit the existing rate limit', async (t) => {
+    installRateLimitCollectionMock(t);
+    rateLimitBuckets.clear();
+    reset({ share: { passwordHash: await bcrypt.hash('correct route password', 4) } });
+
+    const responses = [];
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+        responses.push(await sharePasswordRequest('incorrect route password'));
+    }
+
+    assert.deepEqual(responses.slice(0, 5).map((response) => response.status), [401, 401, 401, 401, 401]);
+    assert.equal(responses[5].status, 429);
+    assert.equal(responses[5].text.includes('incorrect route password'), false);
+});
+
+test('password verification for a different share cannot authorize a download', async () => {
+    reset({ share: { passwordHash: 'bcrypt-hash-placeholder' } });
+    const response = await authenticatedRequest()
+        .set('x-test-verified-share', 'yes')
+        .set('x-test-verified-share-id', new mongoose.Types.ObjectId().toString());
+
+    assert.equal(response.status, 403);
+    assert.equal(context.acquisitions.length, 0);
+    assert.equal(context.storageDownloads, 0);
+});
+
+test('revoked and expired shares reject previously verified password state', async (t) => {
+    for (const kind of ['revoked', 'expired']) {
+        await t.test(kind, async () => {
+            reset({
+                share: {
+                    passwordHash: 'bcrypt-hash-placeholder',
+                    ...(kind === 'revoked'
+                        ? { revokedAt: new Date() }
+                        : { expiresAt: new Date(Date.now() - 1000) })
+                }
+            });
+            const response = await authenticatedRequest()
+                .set('x-test-verified-share', 'yes');
+
+            assert.equal(response.status, 410);
+            assert.equal(context.acquisitions.length, 0);
+            assert.equal(context.storageDownloads, 0);
+        });
     }
 });
 

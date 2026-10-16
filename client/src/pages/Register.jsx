@@ -4,12 +4,15 @@ import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import AuthFrame from '../components/AuthFrame.jsx';
 import { refreshCsrfToken } from '../api/client.js';
+import { getPasswordConfirmationError } from '../utils/authFormValidation.js';
 
 export default function Register() {
   const navigate = useNavigate();
   const [csrfToken, setCsrfToken] = useState('');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -22,6 +25,11 @@ export default function Register() {
   async function submit(event) {
     event.preventDefault();
     setFormError('');
+    const mismatch = getPasswordConfirmationError(password, confirmPassword);
+    if (mismatch) {
+      document.getElementById('confirmPassword')?.focus();
+      return;
+    }
     setSubmitting(true);
     try {
       const form = event.currentTarget;
@@ -72,6 +80,8 @@ export default function Register() {
           autoComplete="new-password"
           minLength={8}
           required
+          value={password}
+          onChange={(event) => { setPassword(event.target.value); setFormError(''); }}
         />
 
         <label htmlFor="confirmPassword">Confirm password</label>
@@ -82,7 +92,14 @@ export default function Register() {
           autoComplete="new-password"
           minLength={8}
           required
+          value={confirmPassword}
+          onChange={(event) => { setConfirmPassword(event.target.value); setFormError(''); }}
+          aria-invalid={Boolean(getPasswordConfirmationError(password, confirmPassword)) || undefined}
+          aria-describedby="confirmPassword-hint"
         />
+        <p className="auth-field-hint" id="confirmPassword-hint" aria-live="polite">
+          {getPasswordConfirmationError(password, confirmPassword)}
+        </p>
 
         {formError && <p className="auth-error" role="alert">{formError}</p>}
         <button type="submit" className="primary-button" disabled={submitting}>

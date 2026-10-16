@@ -29,6 +29,13 @@ spec:
                 secretKeyRef:
                   name: cryptiva-secrets
                   key: SESSION_SECRET
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cryptiva-secrets
+                  key: JWT_SECRET
+            - name: JWT_TTL_SECONDS
+              value: "900"
             - name: MONGODB_URI
               valueFrom:
                 secretKeyRef:

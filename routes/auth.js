@@ -3,6 +3,7 @@
 const express = require('express');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { COOKIE_NAME, authCookieOptions, signAccessToken } = require('../services/jwtService');
 
 const router = express.Router();
 
@@ -183,6 +184,12 @@ router.post(
                     ''
                 );
 
+            const confirmPassword =
+                String(
+                    req.body.confirmPassword ||
+                    ''
+                );
+
 
             /*
             |--------------------------------------------------------------------------
@@ -227,6 +234,11 @@ router.post(
                     '/register'
                 );
 
+            }
+
+            if (!confirmPassword || password !== confirmPassword) {
+                req.flash('error', 'Passwords do not match.');
+                return res.redirect('/register');
             }
 
 
@@ -673,6 +685,16 @@ router.post(
                 user
             );
 
+            const issuedToken = signAccessToken(user);
+            res.cookie(
+                COOKIE_NAME,
+                issuedToken.token,
+                authCookieOptions(
+                    process.env.NODE_ENV === 'production',
+                    issuedToken.ttl * 1000
+                )
+            );
+
 
             /*
             |--------------------------------------------------------------------------
@@ -744,6 +766,13 @@ router.post(
 
         try {
 
+            // Incrementing the account token version invalidates every JWT
+            // issued before logout, including copies held by another client.
+            await User.updateOne(
+                { _id: req.authUser.id },
+                { $inc: { authTokenVersion: 1 } }
+            );
+
             /*
             |--------------------------------------------------------------------------
             | Record Logout BEFORE Destroying Session
@@ -813,6 +842,13 @@ router.post(
                 }
             );
 
+            res.clearCookie(COOKIE_NAME, {
+                httpOnly: true,
+                sameSite: 'lax',
+                secure: process.env.NODE_ENV === 'production',
+                path: '/'
+            });
+
 
             return res.redirect(
                 '/login'
@@ -855,6 +891,13 @@ router.post(
                         '/'
                 }
             );
+
+            res.clearCookie(COOKIE_NAME, {
+                httpOnly: true,
+                sameSite: 'lax',
+                secure: process.env.NODE_ENV === 'production',
+                path: '/'
+            });
 
 
             /*

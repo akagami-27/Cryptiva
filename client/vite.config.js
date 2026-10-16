@@ -21,6 +21,7 @@ export default defineConfig({
       '/security': backendProxy,
       '/profile': backendProxy,
       '/activity': backendProxy,
+      '/search': backendProxy,
       '/me': backendProxy,
       '/csrf-token': backendProxy
     }

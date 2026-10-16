@@ -20,12 +20,14 @@ Run the unit suite with `npm test`. MongoDB reservation integration tests run wh
 
 ## Storage, sessions, and secrets
 
-Uploaded encrypted objects are stored in the configured private Supabase Storage bucket, so replicas do not depend on container-local upload storage. MongoDB Atlas is retained for application records and shared Express sessions. Temporary upload and scanning files are stored in the container's temporary directory and are not the durable file store.
+Uploaded encrypted objects are stored in the configured private Supabase Storage bucket, so replicas do not depend on container-local upload storage. MongoDB Atlas is retained for application records and shared Express sessions. Authentication is granted by the `cryptiva.auth` JWT cookie (HS256, issuer `cryptiva`, audience `cryptiva-web`); the HttpOnly, SameSite=Lax cookie is Secure in production and expires after `JWT_TTL_SECONDS` (900 seconds by default). Protected routes verify its signature, expiry, account status, and the user's current `authTokenVersion`. Logout increments that version, revoking all existing access tokens, then destroys the Express session and clears both cookies. The session remains for CSRF and temporary share-password/return-path state, not as an alternate authentication credential. State-changing requests continue to require the session-bound CSRF token. There is no refresh-token flow; after the access token expires, users sign in again.
 
 Copy `.env.example` to `.env` for local work and supply these values. Never commit `.env` or put secret values in Compose files or Kubernetes manifests.
 
 - `MONGODB_URI`: MongoDB Atlas connection string for the application database.
 - `SESSION_SECRET`: random secret of at least 32 characters.
+- `JWT_SECRET`: separate random secret of at least 32 bytes used only to sign authentication JWTs.
+- `JWT_TTL_SECONDS`: access-token lifetime in seconds (300–3600; default 900).
 - `MASTER_ENCRYPTION_KEY`: stable base64 encoded 32 byte key; changing it prevents decryption of existing data.
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET`: Supabase project and private storage bucket settings.
 - `PUBLIC_APP_URL`: local `http://127.0.0.1:3000`; production exact HTTPS origin.
@@ -33,14 +35,7 @@ Copy `.env.example` to `.env` for local work and supply these values. Never comm
 - `CLAMSCAN_PATH`, `CLAMAV_DATABASE_PATH`: scanner binary and virus definitions location. The supplied Debian image configures these paths.
 - `VITE_API_PROXY_TARGET`: optional local Vite proxy target; defaults to `http://127.0.0.1:3000`.
 
-Generate secrets locally and keep the output private:
-
-```powershell
-node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-```
-
-Use the first output for `SESSION_SECRET` and the second for `MASTER_ENCRYPTION_KEY`.
+Generate independent random values with a password manager or secrets manager, then enter them directly into the local `.env` file or the deployment secret store. Do not echo secret values into terminal output, source control, or logs. Keep `SESSION_SECRET`, `MASTER_ENCRYPTION_KEY`, and `JWT_SECRET` separate.
 
 ## Run locally
 
@@ -48,7 +43,7 @@ For the Express server plus Vite React development server:
 
 ```powershell
 Copy-Item .env.example .env
-# Edit .env with Atlas, Supabase, encryption, and session values.
+# Edit .env with Atlas, Supabase, encryption, session, and JWT values.
 npm start
 ```
 
@@ -58,7 +53,7 @@ In a second terminal:
 npm --prefix client run dev
 ```
 
-Open `http://127.0.0.1:5173/react`. The Vite proxy forwards API requests to Express and retains the same-origin session cookie. Set `VITE_API_PROXY_TARGET` if the backend runs elsewhere.
+Open `http://127.0.0.1:5173/react`. The Vite proxy forwards API requests to Express and retains the same-origin session and JWT cookies. Set `VITE_API_PROXY_TARGET` if the backend runs elsewhere.
 
 To run the integrated container locally, configure `.env` with valid service credentials and run:
 
@@ -77,7 +72,7 @@ Before applying them:
 1. Build and publish the Docker image, then set the real image reference in `k8s/deployment.yaml`.
 2. Set the real public HTTPS host in `k8s/configmap.yaml` and `k8s/ingress.yaml`; set `PUBLIC_APP_URL` to that exact origin.
 3. Create the `cryptiva-tls` TLS secret through cert-manager or the cluster's certificate process.
-4. Create the `cryptiva-secrets` Kubernetes Secret with `SESSION_SECRET`, `MONGODB_URI`, `MASTER_ENCRYPTION_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. Do not commit Secret values. `SUPABASE_BUCKET` is a non-secret ConfigMap setting.
+4. Create the `cryptiva-secrets` Kubernetes Secret with `SESSION_SECRET`, `JWT_SECRET`, `MONGODB_URI`, `MASTER_ENCRYPTION_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. Do not commit Secret values. `SUPABASE_BUCKET` and `JWT_TTL_SECONDS` are non-secret configuration settings.
 5. Confirm cluster egress to Atlas, Supabase, and ClamAV mirrors, and confirm Atlas permits connections from the cluster.
 6. Apply the ConfigMap, Deployment/Service, and Ingress manifests, then check rollout and pod readiness.
 

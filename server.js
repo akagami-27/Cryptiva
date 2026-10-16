@@ -20,6 +20,8 @@ const getPublicAppUrl = require('./config/publicAppUrl');
 
 const connectMongoDB = require('./config/mongodb');
 const { validateMasterEncryptionKey } = require('./services/cryptoService');
+const { validateJwtConfig } = require('./services/jwtService');
+const { hydrateJwtIdentity } = require('./middleware/auth');
 
 const {
     ensureCsrfToken,
@@ -101,6 +103,13 @@ try {
 }
 
 try {
+    validateJwtConfig();
+} catch (error) {
+    console.error(error.message);
+    process.exit(1);
+}
+
+try {
     getPublicAppUrl();
 } catch (error) {
     console.error(error.message);
@@ -155,6 +164,9 @@ app.get('/health/ready', (req, res) => {
     const ready = mongoose.connection.readyState === 1;
     return res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'not-ready' });
 });
+
+/* Route page aliases before public static files so legacy HTML cannot win. */
+app.use(require('./routes/reactPages'));
 
 
 
@@ -249,6 +261,11 @@ app.use(
 
     })
 );
+
+// JWT is the authenticated credential. The Mongo session is retained only for
+// CSRF state and temporary secure-share workflows; old session-only identities
+// are cleared before any route can consume req.session.user.
+app.use(hydrateJwtIdentity);
 
 
 /*
@@ -645,6 +662,11 @@ app.use(
 app.use(
     '/activity',
     require('./routes/activity')
+);
+
+app.use(
+    '/search',
+    require('./routes/search')
 );
 
 

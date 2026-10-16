@@ -3,8 +3,7 @@
    ========================================================= */
 
 :root {
-    --sidebar-width: 260px;
-    --sidebar-collapsed-width: 78px;
+    --sidebar-width: 248px;
 
     --sidebar-bg: rgba(8, 8, 18, 0.96);
     --sidebar-border: rgba(255, 255, 255, 0.06);

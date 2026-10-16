@@ -3,9 +3,22 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
-const { requireAuth, redirectIfAuth } = require('../middleware/auth');
+const { requireAuth, redirectIfAuth, hydrateJwtIdentity } = require('../middleware/auth');
 const { ensureCsrfToken, requireCsrf } = require('../middleware/csrf');
+const User = require('../models/user');
+const { signAccessToken } = require('../services/jwtService');
+process.env.JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(48).toString('base64');
+
+const originalFindById = User.findById;
+function issueTestCookie({ tokenVersion = 0, currentVersion = 0 } = {}) {
+    const { token } = signAccessToken({ _id: '0123456789abcdef01234567', authTokenVersion: tokenVersion });
+    User.findById = () => ({
+        select: async () => ({ _id: { toString: () => 'test-user' }, username: 'test_user', status: 'active', authTokenVersion: currentVersion })
+    });
+    return `cryptiva.auth=${encodeURIComponent(token)}`;
+}
 
 function mockResponse() {
     return {
@@ -36,6 +49,7 @@ function mockRequest({ method = 'GET', session = {}, headers = {}, body = {}, pa
     return {
         method,
         session,
+        headers,
         body,
         path,
         originalUrl: path,
@@ -46,44 +60,99 @@ function mockRequest({ method = 'GET', session = {}, headers = {}, body = {}, pa
     };
 }
 
-test('requireAuth allows authenticated users', () => {
-    const req = mockRequest({ session: { user: { id: '123' } } });
+test('requireAuth accepts a verified JWT and ignores session-only identity', async () => {
+    const cookie = issueTestCookie();
+    const req = mockRequest({ session: { user: { id: 'attacker-controlled' } }, headers: { cookie } });
     const res = mockResponse();
     let nextCalled = false;
 
-    requireAuth(req, res, () => { nextCalled = true; });
+    await requireAuth(req, res, () => { nextCalled = true; });
 
     assert.equal(nextCalled, true);
     assert.equal(res.redirectedTo, null);
+    assert.equal(req.session.user.id, 'test-user');
 });
 
-test('requireAuth redirects unauthenticated users', () => {
-    const req = mockRequest();
+test('requireAuth rejects a session without a JWT', async () => {
+    const req = mockRequest({ session: { user: { id: '123' } } });
     const res = mockResponse();
 
-    requireAuth(req, res, () => assert.fail('next should not run'));
+    await requireAuth(req, res, () => assert.fail('next should not run'));
 
     assert.equal(res.redirectedTo, '/login');
 });
 
-test('redirectIfAuth redirects authenticated users', () => {
-    const req = mockRequest({ session: { user: { id: '123' } } });
+test('request hydration clears legacy session identity when there is no JWT', async () => {
+    const req = mockRequest({ session: { user: { id: 'legacy-session-user' } } });
+    let nextCalled = false;
+    await hydrateJwtIdentity(req, mockResponse(), () => { nextCalled = true; });
+    assert.equal(nextCalled, true);
+    assert.equal(req.session.user, undefined);
+});
+
+test('requireAuth rejects a JWT issued before logout version rotation', async () => {
+    const req = mockRequest({ headers: { cookie: issueTestCookie({ tokenVersion: 0, currentVersion: 1 }) } });
+    const res = mockResponse();
+    await requireAuth(req, res, () => assert.fail('revoked token must not pass'));
+    assert.equal(res.redirectedTo, '/login');
+});
+
+test('requireAuth rejects a valid JWT when the account is disabled', async () => {
+    const cookie = issueTestCookie();
+    User.findById = () => ({
+        select: async () => ({
+            _id: { toString: () => 'test-user' },
+            username: 'test_user',
+            status: 'disabled',
+            authTokenVersion: 0
+        })
+    });
+    const req = mockRequest({ headers: { cookie } });
     const res = mockResponse();
 
-    redirectIfAuth(req, res, () => assert.fail('next should not run'));
+    await requireAuth(req, res, () => assert.fail('disabled account must not pass'));
+
+    assert.equal(res.redirectedTo, '/login');
+    assert.equal(req.authUser, undefined);
+});
+
+test('requireAuth propagates account lookup failures without authenticating the session', async () => {
+    const cookie = issueTestCookie();
+    const databaseError = new Error('simulated account lookup failure');
+    User.findById = () => ({ select: async () => { throw databaseError; } });
+    const req = mockRequest({
+        headers: { cookie },
+        session: { user: { id: 'session-only-identity' } }
+    });
+    let nextError;
+
+    await requireAuth(req, mockResponse(), (error) => { nextError = error; });
+
+    assert.equal(nextError, databaseError);
+    assert.equal(req.authUser, undefined);
+    assert.equal(req.session.user.id, 'session-only-identity');
+});
+
+test('redirectIfAuth redirects a user with a verified JWT', async () => {
+    const req = mockRequest({ headers: { cookie: issueTestCookie() } });
+    const res = mockResponse();
+
+    await redirectIfAuth(req, res, () => assert.fail('next should not run'));
 
     assert.equal(res.redirectedTo, '/dashboard');
 });
 
-test('redirectIfAuth allows unauthenticated users', () => {
+test('redirectIfAuth allows unauthenticated users', async () => {
     const req = mockRequest();
     const res = mockResponse();
     let nextCalled = false;
 
-    redirectIfAuth(req, res, () => { nextCalled = true; });
+    await redirectIfAuth(req, res, () => { nextCalled = true; });
 
     assert.equal(nextCalled, true);
 });
+
+test.after(() => { User.findById = originalFindById; });
 
 test('ensureCsrfToken creates a 64-character token', () => {
     const req = mockRequest({ session: {} });

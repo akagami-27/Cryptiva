@@ -5,13 +5,14 @@ const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
 const crypto = require('node:crypto');
 const ShareLinkModel = require('../models/shareLink');
+const { getSafeMongoTestUri } = require('./helpers/mongoTestSafety');
 const {
     reserveDownloadSlot,
     settleDownloadReservation,
     RESERVATION_LEASE_MS
 } = require('../services/shareDownloadReservations');
 
-const mongoTestUri = process.env.MONGODB_TEST_URI;
+const mongoTestUri = getSafeMongoTestUri();
 
 function makeTestModel(connection, modelName, collectionName) {
     // Reuse the production schema, validators, defaults, and indexes while

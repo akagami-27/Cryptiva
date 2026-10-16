@@ -404,21 +404,20 @@ router.post(
 
         const temporaryFiles =
             req.files || [];
-        const uploadedFiles = [];
-        const createdFiles = [];
+        const processUpload = async () => {
+            const uploadedFiles = [];
+            const createdFiles = [];
 
-        try {
+            try {
 
             if (
                 temporaryFiles.length === 0
             ) {
 
-                return res
-                    .status(400)
-                    .json({
-                        error:
-                            'No files received.'
-                    });
+                return {
+                    status: 400,
+                    body: { error: 'No files received.' }
+                };
 
             }
 
@@ -428,23 +427,17 @@ router.post(
                 );
 
             if (!user) {
-                for (const file of temporaryFiles) {
-                    await cleanupTempFile(file.path);
-                }
-
-                return res.status(401).json({
-                    error: 'Authenticated user not found.'
-                });
+                return {
+                    status: 401,
+                    body: { error: 'Authenticated user not found.' }
+                };
             }
             
             if (user.status !== 'active') {
-                for (const file of temporaryFiles) {
-                    await cleanupTempFile(file.path);
-                }
-
-                return res.status(403).json({
-                    error: 'This account is disabled.'
-                });
+                return {
+                    status: 403,
+                    body: { error: 'This account is disabled.' }
+                };
             }
 
             for (
@@ -669,15 +662,13 @@ router.post(
                 }
             }
 
-            return res.json({
-
-                success:
-                    true,
-
-                files:
-                    uploadedFiles
-
-            });
+            return {
+                status: 200,
+                body: {
+                    success: true,
+                    files: uploadedFiles
+                }
+            };
 
         } catch (error) {
             console.error('File upload failed:', error);
@@ -710,17 +701,6 @@ router.post(
                 }
             }
 
-            for (const file of temporaryFiles) {
-                try {
-                    await cleanupTempFile(file.path);
-                } catch (cleanupError) {
-                    console.error(
-                        'Failed to clean temporary upload file:',
-                        cleanupError.message
-                    );
-                }
-            }
-
             const message = String(error?.message || '');
 
             let statusCode = 500;
@@ -747,15 +727,33 @@ router.post(
                 publicMessage = 'The uploaded file exceeds the allowed size.';
             }
 
-            return res.status(statusCode).json({
-                error: rollbackFailures.length
-                    ? 'The upload failed and some files could not be rolled back. Refresh your file list and contact support if they remain.'
-                    : publicMessage,
-                ...(rollbackFailures.length
-                    ? { partial: true, fileIds: rollbackFailures }
-                    : {})
-            });
+            return {
+                status: statusCode,
+                body: {
+                    error: rollbackFailures.length
+                        ? 'The upload failed and some files could not be rolled back. Refresh your file list and contact support if they remain.'
+                        : publicMessage,
+                    ...(rollbackFailures.length
+                        ? { partial: true, fileIds: rollbackFailures }
+                        : {})
+                }
+            };
+            }
+        };
+
+        let response;
+        try {
+            response = await processUpload();
+        } finally {
+            // Multer writes plaintext files before this handler runs. Remove
+            // only this request's files before sending its response. Cleanup
+            // failures are logged by cleanupTempFile and do not mask errors.
+            for (const file of temporaryFiles) {
+                await cleanupTempFile(file.path);
+            }
         }
+
+        return res.status(response.status).json(response.body);
 
     }
 );

@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "../components/AppShell";
 import "../styles/files.css";
+import FileIntegrityDisclosure from "../components/FileIntegrityDisclosure";
+import { parseShareLimit } from "../utils/shareLimit";
 
 const formatSize = (bytes = 0) => {
   const units = ["B", "KB", "MB", "GB"];
@@ -34,7 +36,7 @@ const getFileId = (file) => file.id || file._id;
 const getCategory = (file) => {
   if (file.category) {
     const category = file.category.toLowerCase();
-    if (["document", "image", "audio", "video"].includes(category)) {
+    if (["document", "image", "audio", "video", "archive", "file"].includes(category)) {
       return category;
     }
   }
@@ -48,9 +50,45 @@ const getCategory = (file) => {
   if (["mp4", "mov", "avi", "mkv", "webm"].includes(extension)) {
     return "video";
   }
+  if (["zip", "rar", "7z", "tar", "gz", "bz2"].includes(extension)) {
+    return "archive";
+  }
+  if (["pdf", "doc", "docx", "odt", "rtf", "txt", "md", "xls", "xlsx", "csv", "ppt", "pptx"].includes(extension)) {
+    return "document";
+  }
 
-  return "document";
+  return "file";
 };
+
+function FileTypeIcon({ file }) {
+  const type = getCategory(file);
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {type === "image" ? (
+        <>
+          <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+          <circle cx="9" cy="9.5" r="1.5" />
+          <path d="m5 17 4.5-4 3 2 2.5-2.5 4 4.5" />
+        </>
+      ) : type === "video" ? (
+        <>
+          <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+          <path d="m10 9 5 3-5 3z" />
+        </>
+      ) : type === "audio" ? (
+        <path d="M14 5v11.2a3.2 3.2 0 1 1-2-3V8l7-1.5v7.7a3.2 3.2 0 1 1-2-3V5.4z" />
+      ) : type === "archive" ? (
+        <path d="M4 7.5h16v12H4zM3 4.5h18v3H3zM10 10h4v2h-4zM10 12v3h4v-3" />
+      ) : (
+        <>
+          <path d="M6 3.5h8l4 4v13H6z" />
+          <path d="M14 3.5v4h4M9 12h6M9 15.5h6" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 async function getCsrfToken() {
   const pageToken =
@@ -117,14 +155,17 @@ export default function Files() {
   const [files, setFiles] = useState([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("date-desc");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [username, setUsername] = useState("User");
   const [selected, setSelected] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragActive, setDragActive] = useState(false);
+  const [dragExtension, setDragExtension] = useState("FILE");
   const [toast, setToast] = useState(null);
-  const [storage, setStorage] = useState(0);
   const [error, setError] = useState("");
 
   const [shareFile, setShareFile] = useState(null);
@@ -143,6 +184,8 @@ export default function Files() {
   }, []);
 
   const loadFiles = useCallback(async (initial = false) => {
+    if (!initial) setRefreshing(true);
+
     try {
       const [me, result] = await Promise.all([
         apiRequest("/me"),
@@ -151,53 +194,104 @@ export default function Files() {
 
       setUsername(me?.user?.username || "User");
       setFiles(Array.isArray(result?.files) ? result.files : []);
-      setStorage(
-        Number(
-          result?.totalSize ??
-          result?.files?.reduce(
-            (sum, file) => sum + (Number(file.size) || 0),
-            0
-          )
-        ) || 0
-      );
       setError("");
     } catch (err) {
       setError(err.message || "Unable to load files.");
     } finally {
       if (initial) setLoading(false);
+      else setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     loadFiles(true);
 
-    const timer = window.setInterval(() => {
-      if (!uploading && !deleting && !sharing) {
-        loadFiles();
-      }
-    }, 3000);
-
     return () => {
-      window.clearInterval(timer);
       window.clearTimeout(toastTimer.current);
     };
-  }, [loadFiles, uploading, deleting, sharing]);
+  }, [loadFiles]);
+
+  useEffect(() => {
+    let dragDepth = 0;
+    const isFileDrag = (event) => Array.from(event.dataTransfer?.types || []).includes("Files");
+    const onDragEnter = (event) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      dragDepth += 1;
+      setDragActive(true);
+      const item = Array.from(event.dataTransfer?.items || []).find((entry) => entry.kind === "file");
+      const name = item?.getAsFile?.()?.name || "";
+      setDragExtension(name.includes(".") ? name.split(".").pop().slice(0, 5).toUpperCase() : "FILE");
+    };
+    const onDragOver = (event) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = uploading ? "none" : "copy";
+    };
+    const onDragLeave = (event) => {
+      if (!isFileDrag(event)) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) setDragActive(false);
+    };
+    const onDrop = (event) => {
+      if (!event.dataTransfer?.files?.length) return;
+      event.preventDefault();
+      dragDepth = 0;
+      setDragActive(false);
+      if (!uploading) uploadFiles(Array.from(event.dataTransfer.files));
+    };
+
+    document.addEventListener("dragenter", onDragEnter);
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("dragleave", onDragLeave);
+    document.addEventListener("drop", onDrop);
+    return () => {
+      document.removeEventListener("dragenter", onDragEnter);
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("dragleave", onDragLeave);
+      document.removeEventListener("drop", onDrop);
+    };
+  }, [uploading]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return files.filter((file) => {
+    const matchingFiles = files.filter((file) => {
       const matchesSearch = getFileName(file).toLowerCase().includes(query);
       const category = getCategory(file);
       const matchesFilter = filter === "all" || category === filter;
 
       return matchesSearch && matchesFilter;
     });
-  }, [files, search, filter]);
+
+    return matchingFiles.sort((left, right) => {
+      if (sortBy === "name-asc") {
+        return getFileName(left).localeCompare(getFileName(right));
+      }
+      if (sortBy === "size-desc") {
+        return (Number(right.size) || 0) - (Number(left.size) || 0);
+      }
+
+      const leftDate = new Date(left.createdAt || left.uploadedAt || 0).getTime() || 0;
+      const rightDate = new Date(right.createdAt || right.uploadedAt || 0).getTime() || 0;
+      return sortBy === "date-asc" ? leftDate - rightDate : rightDate - leftDate;
+    });
+  }, [files, search, filter, sortBy]);
+
+  const latestUpload = useMemo(() => files.reduce((latest, file) => {
+    const timestamp = new Date(file.createdAt || file.uploadedAt || 0).getTime();
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return latest;
+    return !latest || timestamp > latest.timestamp ? { file, timestamp } : latest;
+  }, null), [files]);
+  const storage = useMemo(
+    () => files.reduce((total, file) => total + (Number(file.size) || 0), 0),
+    [files]
+  );
 
   async function uploadFiles(selectedFiles) {
     if (!selectedFiles.length || uploading) return;
 
+    let uploadedCount = 0;
     setUploading(true);
     setUploadProgress(0);
     setError("");
@@ -248,12 +342,17 @@ export default function Files() {
           xhr.onerror = () => reject(new Error("Network error during upload."));
           xhr.send(formData);
         });
+        uploadedCount += 1;
       }
 
       notify("Upload completed successfully.");
       await loadFiles();
     } catch (err) {
-      notify(err.message || "Upload failed.", "error");
+      await loadFiles();
+      const uploadError = err.message || "Upload could not be completed.";
+      notify(uploadedCount > 0
+        ? `${uploadedCount} file${uploadedCount === 1 ? " was" : "s were"} uploaded before the batch stopped. ${uploadError}`
+        : uploadError, "error");
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -269,8 +368,13 @@ export default function Files() {
     try {
       const response = await fetch(
         `/files/download/${encodeURIComponent(id)}`,
-        { credentials: "same-origin" }
+        { credentials: "same-origin", headers: { Accept: "application/json" } }
       );
+
+      if (response.status === 401) {
+        window.location.assign("/react/login");
+        throw new Error("Your sign-in has expired. Please sign in again.");
+      }
 
       if (!response.ok) {
         throw new Error(`Download failed (${response.status})`);
@@ -325,7 +429,14 @@ export default function Files() {
     if (!shareFile || sharing) return;
 
     if (sharePassword.length < 8 || sharePassword.length > 128) {
-      return notify("Password must be 8â€“128 characters.", "error");
+      return notify("Password must be 8–128 characters.", "error");
+    }
+
+    let maxDownloads;
+    try {
+      maxDownloads = parseShareLimit(shareLimit);
+    } catch (err) {
+      return notify(err.message, "error");
     }
 
     const id = getFileId(shareFile);
@@ -342,7 +453,7 @@ export default function Files() {
           body: JSON.stringify({
             password: sharePassword,
             expiresInHours: Number(shareExpiry),
-            maxDownloads: Number(shareLimit),
+                    maxDownloads,
           }),
         }
       );
@@ -373,19 +484,8 @@ export default function Files() {
     }
   }
 
-  function iconFor(file) {
-    const category = getCategory(file);
-    const icons = {
-      image: "â–§",
-      video: "â–¶",
-      audio: "â™«",
-      document: "â–¤",
-    };
-    return icons[category] || "â–¤";
-  }
-
   return (
-    <AppShell username={username} className="files-page" contentClassName="files-content">
+    <AppShell username={username} className={`dashboard-page files-page${dragActive ? " is-file-dragging" : ""}`} contentClassName="dashboard-main">
           <header className="files-header">
             <div className="files-header-copy">
               <div className="files-eyebrow">
@@ -393,7 +493,7 @@ export default function Files() {
                 Secure vault
               </div>
               <h1>My Files</h1>
-              <p>Manage your encrypted files and secure storage.</p>
+              <p>Find, upload and manage files in your personal vault.</p>
             </div>
 
             <button
@@ -419,7 +519,7 @@ export default function Files() {
 
           <section className="files-stats">
             <article className="files-stat-card">
-              <div className="files-stat-icon files-stat-icon-purple">â–¤</div>
+              <div className="files-stat-icon files-stat-icon-purple" aria-hidden="true">▤</div>
               <div>
                 <div className="files-stat-label">Total files</div>
                 <div className="files-stat-value">{files.length}</div>
@@ -427,39 +527,58 @@ export default function Files() {
             </article>
 
             <article className="files-stat-card">
-              <div className="files-stat-icon files-stat-icon-blue">â†“</div>
+              <div className="files-stat-icon files-stat-icon-blue" aria-hidden="true">↓</div>
               <div>
                 <div className="files-stat-label">Storage used</div>
                 <div className="files-stat-value">{formatSize(storage)}</div>
               </div>
             </article>
 
-            <article className="files-stat-card">
-              <div className="files-stat-icon files-stat-icon-green">âœ“</div>
+            <article className="files-stat-card files-stat-card-recent">
+              <div className="files-stat-icon files-stat-icon-green" aria-hidden="true">◷</div>
               <div>
-                <div className="files-stat-label">Protected</div>
-                <div className="files-stat-value">100%</div>
+                <div className="files-stat-label">Most recent upload</div>
+                <div className="files-stat-value" title={latestUpload ? getFileName(latestUpload.file) : undefined}>
+                  {latestUpload ? getFileName(latestUpload.file) : "No uploads yet"}
+                </div>
+                {latestUpload && <small>{formatDate(latestUpload.file.createdAt || latestUpload.file.uploadedAt)}</small>}
               </div>
             </article>
           </section>
 
           {uploading && (
-            <div className="upload-progress">
-              <span>Uploadingâ€¦ {uploadProgress}%</span>
+            <div className="upload-progress" role="status" aria-live="polite">
+              <span>Uploading… {uploadProgress}%</span>
               <div className="progress-track">
                 <div style={{ width: `${uploadProgress}%` }} />
               </div>
             </div>
           )}
 
-          {error && <div className="dashboard-error">{error}</div>}
+          {error && files.length > 0 && (
+            <div className="dashboard-error" role="alert">
+              <span>{error}</span>
+              <button type="button" onClick={() => loadFiles()} disabled={refreshing}>
+                {refreshing ? "Retrying…" : "Retry"}
+              </button>
+            </div>
+          )}
 
           <section className="files-toolbar">
             <div className="files-toolbar-title">
               <h2>Your files</h2>
               <span className="files-count">
-                {filtered.length} {filtered.length === 1 ? "file" : "files"}
+                {filtered.length} of {files.length} {files.length === 1 ? "file" : "files"}
               </span>
+              {(search || filter !== "all") && (
+                <button
+                  type="button"
+                  className="files-clear-filters"
+                  onClick={() => { setSearch(""); setFilter("all"); }}
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
 
             <div className="files-toolbar-actions">
@@ -484,7 +603,29 @@ export default function Files() {
                 <option value="image">Images</option>
                 <option value="audio">Audio</option>
                 <option value="video">Video</option>
+                <option value="archive">Archives</option>
+                <option value="file">Other file types</option>
               </select>
+              <select
+                className="files-filter files-sort"
+                aria-label="Sort files"
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value)}
+              >
+                <option value="date-desc">Newest first</option>
+                <option value="date-asc">Oldest first</option>
+                <option value="name-asc">Name A–Z</option>
+                <option value="size-desc">Largest first</option>
+              </select>
+              <button
+                type="button"
+                className="files-refresh-button"
+                onClick={() => loadFiles()}
+                disabled={refreshing}
+                aria-label="Refresh files"
+              >
+                {refreshing ? "Refreshing…" : "Refresh"}
+              </button>
             </div>
           </section>
 
@@ -494,9 +635,22 @@ export default function Files() {
                 <div className="files-spinner" />
                 <span>Loading your encrypted vault...</span>
               </div>
+            ) : error && files.length === 0 ? (
+              <div className="files-empty" role="alert">
+                <h3>Files could not be loaded</h3>
+                <p>{error}</p>
+                <button
+                  type="button"
+                  className="files-empty-button"
+                  onClick={() => loadFiles()}
+                  disabled={refreshing}
+                >
+                  {refreshing ? "Retrying…" : "Retry"}
+                </button>
+              </div>
             ) : filtered.length === 0 ? (
               <div className="files-empty">
-                <div className="files-empty-icon">â–¤</div>
+                <div className="files-empty-icon" aria-hidden="true"><FileTypeIcon file={{ name: "vault-file" }} /></div>
                 <h3>{files.length ? "No matching files" : "No files yet"}</h3>
                 <p>
                   {files.length
@@ -529,12 +683,16 @@ export default function Files() {
                   {filtered.map((file) => {
                     const id = getFileId(file);
                     const name = getFileName(file);
-                    const hash = file.sha256 || file.hash || "";
+                    const hash = file.integrity?.sha256 ?? file.sha256 ?? file.hash ?? null;
+                    const encryptionAlgorithm = file.encryption?.algorithm;
+                    const encryptionLabel = encryptionAlgorithm
+                      ? String(encryptionAlgorithm).toUpperCase()
+                      : null;
 
                     return (
                       <div className="files-file-row" key={id || name}>
                         <div className="files-file-main">
-                          <div className="files-file-icon">{iconFor(file)}</div>
+                          <div className="files-file-icon" data-type={getCategory(file)} data-extension={name.includes(".") ? name.split(".").pop().toLowerCase() : ""}><FileTypeIcon file={file} /></div>
 
                           <div className="files-file-copy">
                             <div className="files-file-name" title={name}>
@@ -548,18 +706,13 @@ export default function Files() {
                               </span>
                               <span className="files-file-meta-dot" />
                               <span>
-                                {name.includes(".")
-                                  ? name.split(".").pop().toUpperCase()
+                              {name.includes(".")
+                                  ? name.split(".").pop().slice(0, 5).toUpperCase()
                                   : "FILE"}
                               </span>
                             </div>
 
-                            {hash && (
-                              <details className="file-integrity">
-                                <summary>SHA-256 integrity hash</summary>
-                                <code>{hash}</code>
-                              </details>
-                            )}
+                            <FileIntegrityDisclosure hash={hash} />
                           </div>
                         </div>
 
@@ -572,12 +725,12 @@ export default function Files() {
                         </div>
 
                         <div>
-                          <span className="files-security-status">
-                            <span className="files-security-status-dot" />
-                            {file.hasActiveShare || file.isShared || file.shared
-                              ? "Shared"
-                              : "Encrypted"}
-                          </span>
+                          {encryptionLabel && (
+                            <span className="files-security-status" title={`Encrypted at rest using ${encryptionLabel}`}>
+                              <span className="files-security-status-dot" />
+                              {encryptionLabel}
+                            </span>
+                          )}
                         </div>
 
                         <div className="files-actions">
@@ -593,7 +746,7 @@ export default function Files() {
                               setShareLimit("1");
                             }}
                           >
-                            â†—
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"/></svg>
                           </button>
 
                           <button
@@ -603,7 +756,7 @@ export default function Files() {
                             aria-label={`Download ${name}`}
                             onClick={() => downloadFile(file)}
                           >
-                            â†“
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3"/></svg>
                           </button>
 
                           <button
@@ -613,7 +766,7 @@ export default function Files() {
                             aria-label={`Delete ${name}`}
                             onClick={() => setSelected(file)}
                           >
-                            Ã—
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"/></svg>
                           </button>
                         </div>
                       </div>
@@ -624,14 +777,27 @@ export default function Files() {
             )}
           </section>
 
-          <section className="files-security-note">
-            <div className="files-security-note-icon">âœ“</div>
-            <div>
-              <strong>Your files are encrypted</strong>
-              <p>
-                SHA-256 hashes can help verify file integrity when the server
-                provides the stored hash.
-              </p>
+          <section className="files-security-note" aria-labelledby="vault-protection-title">
+            <div className="files-security-note-heading">
+              <div className="files-security-note-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6l-7-3Z"/><path d="M9 12h6"/></svg></div>
+              <div>
+                <strong id="vault-protection-title">Vault protection</strong>
+                <p>Protection built into Cryptiva’s file storage and sharing flows.</p>
+              </div>
+            </div>
+            <div className="files-security-grid">
+              <article className="files-security-item">
+                <span className="files-security-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+                <div><strong>AES-256-GCM encryption</strong><p>File contents are encrypted before they are stored.</p></div>
+              </article>
+              <article className="files-security-item">
+                <span className="files-security-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+                <div><strong>SHA-256 integrity reference</strong><p>Cryptiva checks file contents against the stored digest during protected downloads.</p></div>
+              </article>
+              <article className="files-security-item">
+                <span className="files-security-item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"/></svg></span>
+                <div><strong>Controlled file sharing</strong><p>Share links support passwords, expiry times, and download limits.</p></div>
+              </article>
             </div>
           </section>
       {shareFile && (
@@ -656,7 +822,7 @@ export default function Files() {
               disabled={sharing}
               aria-label="Close dialog"
             >
-              Ã—
+              ×
             </button>
 
             <div className="section-kicker">CONTROLLED ACCESS</div>
@@ -665,7 +831,7 @@ export default function Files() {
 
             <form onSubmit={handleShare}>
               <label className="form-field">
-                <span>Password (8â€“128 characters)</span>
+                <span>Password (8–128 characters)</span>
                 <input
                   type="password"
                   minLength={8}
@@ -696,17 +862,19 @@ export default function Files() {
 
                 <label className="form-field">
                   <span>Maximum downloads</span>
-                  <select
+                  <input
+                    type="number"
+                    min="1"
+                    max="100000"
+                    step="1"
                     value={shareLimit}
                     onChange={(event) => setShareLimit(event.target.value)}
-                  >
-                    <option value="1">1 download</option>
-                    <option value="5">5 downloads</option>
-                    <option value="10">10 downloads</option>
-                    <option value="25">25 downloads</option>
-                    <option value="50">50 downloads</option>
-                    <option value="100">100 downloads</option>
-                  </select>
+                    placeholder="Unlimited"
+                    aria-describedby="share-limit-help"
+                  />
+                  <small id="share-limit-help">
+                    Enter 1–100000, or leave blank for unlimited downloads.
+                  </small>
                 </label>
               </div>
 
@@ -720,7 +888,7 @@ export default function Files() {
                 type="submit"
                 disabled={sharing}
               >
-                {sharing ? "Creating linkâ€¦" : "Generate secure link"}
+                {sharing ? "Creating link…" : "Generate secure link"}
               </button>
             </form>
           </section>
@@ -767,6 +935,15 @@ export default function Files() {
       {toast && (
         <div className={`files-toast ${toast.type} show`} role="status">
           {toast.message}
+        </div>
+      )}
+      {dragActive && (
+        <div className="files-drop-overlay" aria-live="polite">
+          <div className="files-drop-card">
+            <span className="files-drop-tile" aria-hidden="true">{dragExtension}</span>
+            <strong>Release to add to your vault</strong>
+            <span>Files will use the existing secure upload flow.</span>
+          </div>
         </div>
       )}
     </AppShell>

@@ -13,7 +13,12 @@ ENV NODE_ENV=production PORT=3000 \
     CLAMAV_DATABASE_PATH=/var/lib/clamav
 WORKDIR /app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends clamav clamav-freshclam gosu \
+    && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    clamav \
+    clamav-freshclam \
+    gosu \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force

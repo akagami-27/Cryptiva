@@ -48,6 +48,11 @@ export async function apiFetch(url, options = {}) {
     credentials: 'same-origin'
   });
 
+  if (response.status === 401) {
+    window.location.assign('/react/login');
+    throw new Error('Your sign-in has expired. Please sign in again.');
+  }
+
   const contentType = response.headers.get('content-type') || '';
   if (response.redirected || contentType.includes('text/html')) {
     window.location.assign('/react/login');
