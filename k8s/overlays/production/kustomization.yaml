@@ -6,12 +6,9 @@ resources:
 images:
   - name: cryptiva
     newName: public-registry.smolelab.com/og/cryptiva
-    newTag: dev
+    newTag: latest
 patches:
   - path: deployment-patch.yaml
-    target:
-      kind: Deployment
-      name: cryptiva
     target:
       kind: Deployment
       name: cryptiva

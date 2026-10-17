@@ -22,6 +22,8 @@ spec:
         app.kubernetes.io/name: cryptiva
     spec:
       automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: harbor-registry
       securityContext:
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch

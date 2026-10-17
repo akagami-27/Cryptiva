@@ -46,7 +46,7 @@ function getSafeReturnPath(value) {
         typeof value !== 'string' ||
         value.length === 0
     ) {
-        return '/react/dashboard';
+        return '/dashboard';
     }
 
     if (
@@ -54,27 +54,25 @@ function getSafeReturnPath(value) {
         value.startsWith('//') ||
         value.includes('\\')
     ) {
-        return '/react/dashboard';
+        return '/dashboard';
     }
 
     if (
         value === '/dashboard' ||
         [
-            '/react/dashboard',
-            '/react/files',
-            '/react/shared',
-            '/react/activity',
-            '/react/profile',
-            '/react/security'
+            '/dashboard',
+            '/files',
+            '/shared',
+            '/activity',
+            '/profile',
+            '/security'
         ].includes(value) ||
         value.startsWith('/files/shared/')
     ) {
-        return value === '/dashboard'
-            ? '/react/dashboard'
-            : value;
+        return value;
     }
 
-    return '/react/dashboard';
+    return '/dashboard';
 }
 
 

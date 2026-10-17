@@ -166,7 +166,7 @@ app.get('/health/ready', (req, res) => {
 });
 
 /* Route page aliases before public static files so legacy HTML cannot win. */
-app.use(require('./routes/reactPages'));
+// Removed legacy reactPages router
 
 
 
@@ -733,7 +733,7 @@ app.use(
 const reactDistPath = path.join(__dirname, 'client', 'dist');
 const reactIndexPath = path.join(reactDistPath, 'index.html');
 app.use(express.static(reactDistPath, { index: false }));
-app.get(/^\/react(?:\/.*)?$/, (req, res, next) => {
+app.get(/^\/(?!api|health|files|shared|security|profile|activity|search|dashboard|login|register|logout|csrf-token).*$/, (req, res, next) => {
     if (!fs.existsSync(reactIndexPath)) return next();
     return res.sendFile(reactIndexPath);
 });
