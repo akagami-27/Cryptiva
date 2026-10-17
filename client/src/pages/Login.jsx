@@ -6,7 +6,7 @@ import { refreshCsrfToken } from '../api/client.js';
 export default function Login() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
-  const returnTo = params.get('returnTo') || '/react/dashboard';
+  const returnTo = params.get('returnTo') || '/dashboard';
 
   const [csrfToken, setCsrfToken] = useState('');
   const [formError, setFormError] = useState('');
@@ -32,7 +32,7 @@ export default function Login() {
       setCsrfToken(token);
       const response = await fetch('/login', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, credentials: 'same-origin', redirect: 'follow' });
       const destination = new URL(response.url, window.location.origin);
-      if (response.redirected && destination.pathname === '/react/dashboard') { window.location.assign(destination.pathname + destination.search); return; }
+      if (response.redirected && destination.pathname === '/dashboard') { window.location.assign(destination.pathname + destination.search); return; }
       if (response.redirected && destination.pathname.startsWith('/files/shared/')) { window.location.assign(destination.pathname); return; }
       setFormError('Unable to sign in with those details. Please check your username and password.');
     } catch { setFormError('Unable to reach the sign-in service. Please try again.'); }
@@ -41,7 +41,7 @@ export default function Login() {
 
   return (
     <AuthFrame>
-      <a className="brand" href="/react" aria-label="Cryptiva home">
+      <a className="brand" href="/" aria-label="Cryptiva home">
         <span className="brand-mark">C</span>
         <span>cryptiva</span>
       </a>
@@ -82,7 +82,7 @@ export default function Login() {
       </form>
 
       <p className="auth-footer">
-        New to Cryptiva? <Link to="/react/register">Create an account</Link>
+        New to Cryptiva? <Link to="/register">Create an account</Link>
       </p>
 
       <p className="auth-note">

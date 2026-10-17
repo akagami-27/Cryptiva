@@ -39,7 +39,7 @@ async function apiRequest(url, options = {}) {
   if (response.status === 401 || response.status === 403) {
     // Do not redirect on every 403: it may be a CSRF failure.
     if (response.status === 401) {
-      window.location.href = "/react/login";
+      window.location.href = "/login";
     }
   }
 

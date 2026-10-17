@@ -204,9 +204,9 @@ export default function Landing() {
       </div>
 
       <nav className="cv-nav" aria-label="Main navigation">
-        <Link className="cv-brand" to="/react" aria-label="Cryptiva home"><CryptivaMark /><span>cryptiva<span className="cv-brand-dot">.</span></span></Link>
+        <Link className="cv-brand" to="/" aria-label="Cryptiva home"><CryptivaMark /><span>cryptiva<span className="cv-brand-dot">.</span></span></Link>
         <div className="cv-nav-links"><a href="#security">Security</a><a href="#approach">Our approach</a></div>
-        <div className="cv-nav-actions"><Link className="cv-sign-in" to="/react/login">Sign in</Link><Link className="cv-nav-cta" to="/react/register">Get started <span>↗</span></Link></div>
+        <div className="cv-nav-actions"><Link className="cv-sign-in" to="/login">Sign in</Link><Link className="cv-nav-cta" to="/register">Get started <span>↗</span></Link></div>
       </nav>
 
       <section className="cv-hero" id="top">
@@ -217,7 +217,7 @@ export default function Landing() {
           <p className="cv-hero-subtitle landing-reveal">Secure File Sharing with AES Encryption</p>
           <div className="cv-hero-accent" aria-hidden="true" />
           <p className="cv-hero-lede landing-reveal">Sensitive files, thoughtfully protected—with clear sharing controls and integrity details that stay within reach.</p>
-          <div className="cv-hero-actions landing-reveal"><Link className="cv-button cv-button--primary" to="/react/register">Enter Vault <span>→</span></Link><a className="cv-button cv-button--secondary" href="#approach">Explore the system <span>↓</span></a></div>
+          <div className="cv-hero-actions landing-reveal"><Link className="cv-button cv-button--primary" to="/register">Enter Vault <span>→</span></Link><a className="cv-button cv-button--secondary" href="#approach">Explore the system <span>↓</span></a></div>
           <div className="cv-hero-meta landing-reveal" aria-label="Cryptiva features"><span className="cv-meta--cyan"><i /> Privacy-minded workflow</span><span className="cv-meta--violet"><i /> Clear sharing controls</span><span className="cv-meta--amber"><i /> Integrity visibility</span></div>
         </div>
         <WorkspacePreview />
@@ -237,7 +237,7 @@ export default function Landing() {
               <div className="cv-story-eyebrow"><span>{feature.number}</span><i /> {feature.eyebrow}</div>
               <h2>{feature.title}</h2>
               <p>{feature.description}</p>
-              <Link className="cv-text-link" to="/react/register">Explore the workspace <span>↗</span></Link>
+              <Link className="cv-text-link" to="/register">Explore the workspace <span>↗</span></Link>
             </div>
             <FeatureArtwork kind={feature.kind} />
           </article>
@@ -250,12 +250,12 @@ export default function Landing() {
           <div className="cv-cta-overline"><span>04</span><i /> MAKE SPACE FOR FOCUS</div>
           <h2>Your files.<br /><em>Your call.</em></h2>
           <p>Bring your documents into a workspace that puts the important controls where you need them.</p>
-          <Link className="cv-button cv-button--primary" to="/react/register">Get started with Cryptiva <span>↗</span></Link>
-          <small>Already have an account? <Link to="/react/login">Sign in</Link></small>
+          <Link className="cv-button cv-button--primary" to="/register">Get started with Cryptiva <span>↗</span></Link>
+          <small>Already have an account? <Link to="/login">Sign in</Link></small>
         </div>
       </section>
 
-      <footer className="cv-footer"><Link className="cv-brand" to="/react"><CryptivaMark /><span>cryptiva<span className="cv-brand-dot">.</span></span></Link><span>Thoughtful file sharing. Built around control.</span><a href="#top">Back to top ↑</a></footer>
+      <footer className="cv-footer"><Link className="cv-brand" to="/"><CryptivaMark /><span>cryptiva<span className="cv-brand-dot">.</span></span></Link><span>Thoughtful file sharing. Built around control.</span><a href="#top">Back to top ↑</a></footer>
     </main>
   );
 }

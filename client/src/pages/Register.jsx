@@ -39,7 +39,7 @@ export default function Register() {
       setCsrfToken(token);
       const response = await fetch('/register', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, credentials: 'same-origin', redirect: 'follow' });
       const destination = new URL(response.url, window.location.origin);
-      if (response.redirected && destination.pathname === '/login') { navigate('/react/login?registered=1'); return; }
+      if (response.redirected && destination.pathname === '/login') { navigate('/login?registered=1'); return; }
       setFormError('Unable to create the account. Check the details and try again.');
     } catch { setFormError('Unable to reach the registration service. Please try again.'); }
     finally { setSubmitting(false); }
@@ -47,7 +47,7 @@ export default function Register() {
 
   return (
     <AuthFrame>
-      <a className="brand" href="/react" aria-label="Cryptiva home">
+      <a className="brand" href="/" aria-label="Cryptiva home">
         <span className="brand-mark">C</span>
         <span>cryptiva</span>
       </a>
@@ -108,7 +108,7 @@ export default function Register() {
       </form>
 
       <p className="auth-footer">
-        Already registered? <Link to="/react/login">Sign in</Link>
+        Already registered? <Link to="/login">Sign in</Link>
       </p>
 
       <p className="auth-note">

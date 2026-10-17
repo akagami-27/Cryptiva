@@ -2,15 +2,15 @@ import { NavLink } from "react-router-dom";
 import { getCsrfToken } from "../api/client";
 
 const workspaceLinks = [
-  { label: "Dashboard", path: "/react/dashboard", icon: "dashboard" },
-  { label: "Files", path: "/react/files", icon: "files" },
-  { label: "Shared Files", path: "/react/shared", icon: "shared" },
-  { label: "Activity", path: "/react/activity", icon: "activity" },
+  { label: "Dashboard", path: "/dashboard", icon: "dashboard" },
+  { label: "Files", path: "/files", icon: "files" },
+  { label: "Shared Files", path: "/shared", icon: "shared" },
+  { label: "Activity", path: "/activity", icon: "activity" },
 ];
 
 const accountLinks = [
-  { label: "Profile", path: "/react/profile", icon: "profile" },
-  { label: "Security", path: "/react/security", icon: "security" },
+  { label: "Profile", path: "/profile", icon: "profile" },
+  { label: "Security", path: "/security", icon: "security" },
 ];
 
 function NavigationIcon({ name }) {
@@ -74,7 +74,7 @@ export default function Sidebar({
     } catch (error) {
       console.error(error);
     } finally {
-      window.location.assign("/react/login");
+      window.location.assign("/login");
     }
   }
 
@@ -86,7 +86,7 @@ export default function Sidebar({
       className={`cryptiva-sidebar${mobileOpen ? " mobile-open" : ""}`}
       aria-label="Main navigation"
     >
-      <NavLink to="/react/dashboard" className="sidebar-brand" onClick={onCloseMobile} aria-label="Cryptiva dashboard">
+      <NavLink to="/dashboard" className="sidebar-brand" onClick={onCloseMobile} aria-label="Cryptiva dashboard">
         <img className="sidebar-brand-icon" src="/images/cryptiva-logo.png" alt="" />
         <span className="sidebar-brand-name">CRYPTIVA</span>
       </NavLink>

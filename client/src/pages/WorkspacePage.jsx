@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell.jsx';
 import { apiFetch } from '../api/client.js';
@@ -102,7 +102,7 @@ function SharedFiles() {
           <h2>Your shared access</h2>
           <p>Review expiry, download usage and protection for each active or inactive link.</p>
         </div>
-        <Link className="primary-button shared-create-link" to="/react/files">
+        <Link className="primary-button shared-create-link" to="/files">
           <span aria-hidden="true">＋</span> Choose a file to share
         </Link>
       </header>

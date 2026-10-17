@@ -1,4 +1,4 @@
-﻿
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "../components/AppShell";
 import "../styles/files.css";
@@ -138,7 +138,7 @@ async function apiRequest(url, options = {}) {
     : null;
 
   if (response.status === 401) {
-    window.location.href = "/react/login";
+      window.location.href = "/login";
     throw new Error("Your session has expired.");
   }
 
@@ -372,7 +372,7 @@ export default function Files() {
       );
 
       if (response.status === 401) {
-        window.location.assign("/react/login");
+        window.location.assign("/login");
         throw new Error("Your sign-in has expired. Please sign in again.");
       }
 

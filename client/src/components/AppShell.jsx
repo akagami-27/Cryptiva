@@ -52,7 +52,7 @@ export default function AppShell({ username = "User", className = "", contentCla
               {mobileOpen ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
             </svg>
           </button>
-          <a className="app-mobile-brand" href="/react/dashboard">
+          <a className="app-mobile-brand" href="/dashboard">
             <img src="/images/cryptiva-logo.png" alt="" /> CRYPTIVA
           </a>
           <GlobalSearch disabled={mobileOpen} />

@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { apiFetch } from '../api/client.js';
 
 const routes = {
-  file: '/react/files',
-  share: '/react/shared',
-  activity: '/react/activity'
+  file: '/files',
+  share: '/shared',
+  activity: '/activity'
 };
 
 function formatBytes(value = 0) {
@@ -200,7 +200,7 @@ export default function GlobalSearch({ disabled = false }) {
                   <li key={`${result.type}:${result.id}`}>
                     <Link
                       ref={(element) => { resultRefs.current[index] = element; }}
-                      to={routes[result.type] || '/react/dashboard'}
+                      to={routes[result.type] || '/dashboard'}
                       onKeyDown={(event) => handleResultKeyDown(event, index)}
                       onClick={() => closeSearch(false)}
                     >
