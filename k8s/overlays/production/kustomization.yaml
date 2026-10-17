@@ -5,7 +5,13 @@ resources:
   - ../../base
 images:
   - name: cryptiva
-    newName: harbor.example.invalid/replace-project/cryptiva
+    newName: public-registry.smolelab.com/og/cryptiva
     newTag: dev
 patches:
   - path: deployment-patch.yaml
+    target:
+      kind: Deployment
+      name: cryptiva
+    target:
+      kind: Deployment
+      name: cryptiva
