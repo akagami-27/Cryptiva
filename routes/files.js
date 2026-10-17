@@ -1862,7 +1862,7 @@ router.get(
                         }
 
                         return res.redirect(
-                            `/react/login?returnTo=${encodeURIComponent(sharePath)}`
+                            `/login?returnTo=${encodeURIComponent(sharePath)}`
                         );
 
                     }

@@ -49,13 +49,13 @@ export async function apiFetch(url, options = {}) {
   });
 
   if (response.status === 401) {
-    window.location.assign('/react/login');
+    window.location.assign('/login');
     throw new Error('Your sign-in has expired. Please sign in again.');
   }
 
   const contentType = response.headers.get('content-type') || '';
   if (response.redirected || contentType.includes('text/html')) {
-    window.location.assign('/react/login');
+    window.location.assign('/login');
     throw new Error('Your session may have expired. Please sign in again.');
   }
 
