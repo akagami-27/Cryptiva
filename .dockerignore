@@ -1,7 +1,9 @@
 .env
 .env.*
 !.env.example
+.env.k8s-secret
 k8s/cryptiva-secrets.env
+k8s/cryptiva-secrets.yaml
 node_modules
 client/node_modules
 client/dist

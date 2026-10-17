@@ -69,23 +69,24 @@ The supplied manifests include a two replica Deployment, ClusterIP Service, heal
 
 Before applying them:
 
-1. Build and publish the Docker image, then set the real image reference in `k8s/deployment.yaml`.
-2. Set the real public HTTPS host in `k8s/configmap.yaml` and `k8s/ingress.yaml`; set `PUBLIC_APP_URL` to that exact origin.
-3. Create the `cryptiva-tls` TLS secret through cert-manager or the cluster's certificate process.
-4. Create the `cryptiva-secrets` Kubernetes Secret with `SESSION_SECRET`, `JWT_SECRET`, `MONGODB_URI`, `MASTER_ENCRYPTION_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. Do not commit Secret values. `SUPABASE_BUCKET` and `JWT_TTL_SECONDS` are non-secret configuration settings.
+1. Build and publish the Docker image to the approved Harbor project, then replace the image name and immutable tag in `k8s/overlays/production/kustomization.yaml`.
+2. Confirm the public HTTPS host is `cryptiva.smolelab.com` and matches `PUBLIC_APP_URL` in `k8s/base/configmap.yaml` and `k8s/base/ingress.yaml`.
+3. Confirm the existing `letsencrypt-prod` ClusterIssuer can issue `cryptiva-tls` for the configured host and that its challenge works with the Cloudflare Tunnel routing.
+4. Create the `cryptiva-secrets` Kubernetes Secret from the ignored `.env.k8s-secret` file using the commands in `k8s/README.md`. Do not commit Secret values. `SUPABASE_BUCKET` and `JWT_TTL_SECONDS` are non-secret configuration settings.
 5. Confirm cluster egress to Atlas, Supabase, and ClamAV mirrors, and confirm Atlas permits connections from the cluster.
-6. Apply the ConfigMap, Deployment/Service, and Ingress manifests, then check rollout and pod readiness.
+6. Render and review `kubectl kustomize k8s/overlays/production`, then use `kubectl apply -k k8s/overlays/production` only after authorization and prerequisites are confirmed. Check rollout and pod readiness.
 
-Example commands after filling in the cluster-specific values and creating the Secret/TLS Secret:
+Example commands after replacing the Harbor placeholder, creating the application Secret, and confirming the TLS issuer:
 
 ```sh
-docker build -t ghcr.io/YOUR_ORG/cryptiva:YOUR_TAG .
-docker push ghcr.io/YOUR_ORG/cryptiva:YOUR_TAG
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/ingress.yaml
-kubectl rollout status deployment/cryptiva
+docker build -t harbor.example.invalid/replace-project/cryptiva:REPLACE_WITH_IMMUTABLE_TAG .
+docker push harbor.example.invalid/replace-project/cryptiva:REPLACE_WITH_IMMUTABLE_TAG
+kubectl kustomize k8s/overlays/production
+kubectl apply -k k8s/overlays/production
+kubectl rollout status deployment/cryptiva --namespace=cryptiva
 ```
+
+These are operator-run examples only. Replace the `.invalid` registry and tag consistently in the build/push commands and `k8s/overlays/production/kustomization.yaml` before use.
 
 The manifests have not been applied to a Kubernetes cluster as part of this work. A real domain, DNS, ingress controller, TLS provisioning, Atlas network access, Supabase credentials, and image registry access are still required before deployment.
 

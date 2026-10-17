@@ -2,24 +2,46 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cryptiva
+  namespace: cryptiva
+  labels:
+    app.kubernetes.io/name: cryptiva
 spec:
-  replicas: 2
+  replicas: 1
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: cryptiva
+      app.kubernetes.io/name: cryptiva
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
-        app: cryptiva
+        app.kubernetes.io/name: cryptiva
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
+      volumes:
+        - name: upload-tmp
+          emptyDir:
+            sizeLimit: 2Gi
       containers:
         - name: cryptiva
-          image: ghcr.io/your-org/cryptiva:latest
+          image: cryptiva:local
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
           ports:
             - name: http
               containerPort: 3000
+              protocol: TCP
           envFrom:
             - configMapRef:
                 name: cryptiva-config
@@ -61,34 +83,31 @@ spec:
               path: /health/live
               port: http
             periodSeconds: 10
-            failureThreshold: 30
+            timeoutSeconds: 3
+            failureThreshold: 90
           livenessProbe:
             httpGet:
               path: /health/live
               port: http
             periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health/ready
               port: http
             periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: upload-tmp
+              mountPath: /app/tmp
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: "250m"
+              memory: "512Mi"
+              ephemeral-storage: "1Gi"
             limits:
               cpu: "1"
-              memory: 1Gi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: cryptiva
-spec:
-  type: ClusterIP
-  selector:
-    app: cryptiva
-  ports:
-    - name: http
-      port: 80
-      targetPort: http
+              memory: "1Gi"
+              ephemeral-storage: "3Gi"
