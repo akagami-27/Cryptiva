@@ -214,7 +214,7 @@ test('successful login regenerates and explicitly saves the authenticated sessio
         .redirects(0);
 
     assert.equal(response.status, 302);
-    assert.equal(response.headers.location, '/react/dashboard');
+    assert.equal(response.headers.location, '/dashboard');
     assert.equal(routeState.regenerateCalls, 1);
     assert.equal(routeState.saveCalls, 1);
     assert.equal(routeState.lastRequest.session.user.id, 'test-user-id');
