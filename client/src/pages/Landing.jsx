@@ -217,7 +217,7 @@ export default function Landing() {
           <p className="cv-hero-subtitle landing-reveal">Secure File Sharing with AES Encryption</p>
           <div className="cv-hero-accent" aria-hidden="true" />
           <p className="cv-hero-lede landing-reveal">Sensitive files, thoughtfully protected—with clear sharing controls and integrity details that stay within reach.</p>
-          <div className="cv-hero-actions landing-reveal"><Link className="cv-button cv-button--primary" to="/register">Enter Vault <span>→</span></Link><a className="cv-button cv-button--secondary" href="#approach">Explore the system <span>↓</span></a></div>
+          <div className="cv-hero-actions landing-reveal"><Link className="cv-button cv-button--primary" to="/dashboard">Enter Vault <span>→</span></Link><a className="cv-button cv-button--secondary" href="#approach">Explore the system <span>↓</span></a></div>
           <div className="cv-hero-meta landing-reveal" aria-label="Cryptiva features"><span className="cv-meta--cyan"><i /> Privacy-minded workflow</span><span className="cv-meta--violet"><i /> Clear sharing controls</span><span className="cv-meta--amber"><i /> Integrity visibility</span></div>
         </div>
         <WorkspacePreview />
@@ -237,7 +237,7 @@ export default function Landing() {
               <div className="cv-story-eyebrow"><span>{feature.number}</span><i /> {feature.eyebrow}</div>
               <h2>{feature.title}</h2>
               <p>{feature.description}</p>
-              <Link className="cv-text-link" to="/register">Explore the workspace <span>↗</span></Link>
+              <Link className="cv-text-link" to="/dashboard">Explore the workspace <span>↗</span></Link>
             </div>
             <FeatureArtwork kind={feature.kind} />
           </article>

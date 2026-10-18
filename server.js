@@ -32,6 +32,8 @@ const {
     errorHandler,
     notFoundHandler
 } = require('./middleware/errorHandler');
+const { requireAuth, redirectIfAuth } = require('./middleware/auth');
+const { registerReactPages } = require('./routes/reactPages');
 
 const securityRoutes =
     require('./routes/security');
@@ -629,6 +631,28 @@ app.use(
 |--------------------------------------------------------------------------
 */
 
+/*
+|--------------------------------------------------------------------------
+| React page entry points
+|--------------------------------------------------------------------------
+| Exact page paths must be registered before legacy page routers. The API
+| routers below still own their nested endpoints and enforce authorization.
+|--------------------------------------------------------------------------
+*/
+
+const reactDistPath = path.join(__dirname, 'client', 'dist');
+const reactIndexPath = path.join(reactDistPath, 'index.html');
+registerReactPages(app, {
+    requireAuth,
+    redirectIfAuth,
+    sendApp: (req, res, next) => {
+        if (!fs.existsSync(reactIndexPath)) {
+            return res.status(503).send('React application build is unavailable.');
+        }
+        return res.sendFile(reactIndexPath);
+    }
+});
+
 
 /*
 |--------------------------------------------------------------------------
@@ -730,13 +754,7 @@ app.use(
 );
 
 /* Serve the production React build and support direct BrowserRouter refreshes. */
-const reactDistPath = path.join(__dirname, 'client', 'dist');
-const reactIndexPath = path.join(reactDistPath, 'index.html');
 app.use(express.static(reactDistPath, { index: false }));
-app.get(/^\/(?!api|health|files|shared|security|profile|activity|search|dashboard|login|register|logout|csrf-token).*$/, (req, res, next) => {
-    if (!fs.existsSync(reactIndexPath)) return next();
-    return res.sendFile(reactIndexPath);
-});
 
 
 /*

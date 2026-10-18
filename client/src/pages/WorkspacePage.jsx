@@ -155,7 +155,7 @@ function SharedFiles() {
             {files.length ? (
               <button className="secondary-button" onClick={() => setQuery('')}>Clear search</button>
             ) : (
-              <Link className="secondary-button" to="/react/files">Choose a file to share</Link>
+              <Link className="secondary-button" to="/files">Choose a file to share</Link>
             )}
           </div>
         ) : (
@@ -507,7 +507,7 @@ function Profile() {
           <p className="section-kicker">ACCOUNT PROTECTION</p>
           <h2>Keep your account secure</h2>
           <p>Review recent security activity and update your password from your Security settings.</p>
-          <Link className="secondary-button" to="/react/security">Go to Security <span aria-hidden="true">→</span></Link>
+          <Link className="secondary-button" to="/security">Go to Security <span aria-hidden="true">→</span></Link>
         </section>
       </div>
       </>}
