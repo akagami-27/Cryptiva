@@ -8,6 +8,11 @@ const router = express.Router();
 
 const User = require('../models/user');
 const AuditLog = require('../models/auditlog');
+const {
+    COOKIE_NAME,
+    authCookieOptions,
+    signAccessToken
+} = require('../services/jwtService');
 
 const { requireAuth } = require('../middleware/auth');
 const {
@@ -523,13 +528,67 @@ router.post(
 
 
             /*
-             * Update only passwordHash.
+             * Update the password and rotate the token version atomically.
+             * The old hash and token version make concurrent credential
+             * changes or logouts fail instead of overwriting one another.
              */
 
-            user.passwordHash =
-                passwordHash;
+            const currentTokenVersion = Number.isSafeInteger(user.authTokenVersion)
+                ? user.authTokenVersion
+                : 0;
+            const tokenVersionFilter = currentTokenVersion === 0
+                ? {
+                    $or: [
+                        { authTokenVersion: 0 },
+                        { authTokenVersion: null }
+                    ]
+                }
+                : { authTokenVersion: currentTokenVersion };
+            const tokenVersionUpdate = currentTokenVersion === 0
+                ? {
+                    $set: {
+                        passwordHash,
+                        authTokenVersion: 1
+                    }
+                }
+                : {
+                    $set: { passwordHash },
+                    $inc: { authTokenVersion: 1 }
+                };
 
-            await user.save();
+            const updatedUser = await User.findOneAndUpdate(
+                {
+                    _id: user._id,
+                    passwordHash: user.passwordHash,
+                    ...tokenVersionFilter
+                },
+                tokenVersionUpdate,
+                {
+                    new: true,
+                    runValidators: true
+                }
+            );
+
+            if (!updatedUser) {
+                return res
+                    .status(409)
+                    .json({
+                        error:
+                            'Account credentials changed during this request. Please try again.'
+                    });
+            }
+
+            // Reissue only this browser's JWT. The incremented version
+            // invalidates every previously issued token for the account.
+            const issuedToken = signAccessToken(updatedUser);
+            res.cookie(
+                COOKIE_NAME,
+                issuedToken.token,
+                authCookieOptions(
+                    process.env.NODE_ENV === 'production',
+                    issuedToken.ttl * 1000
+                )
+            );
 
 
             /*

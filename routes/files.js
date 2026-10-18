@@ -404,6 +404,13 @@ router.post(
 
         const temporaryFiles =
             req.files || [];
+        const scanAbortController = new AbortController();
+        const abortScanForDisconnectedClient = () => {
+            if (!res.writableEnded) scanAbortController.abort();
+        };
+        req.once('aborted', abortScanForDisconnectedClient);
+        res.once('close', abortScanForDisconnectedClient);
+
         const processUpload = async () => {
             const uploadedFiles = [];
             const createdFiles = [];
@@ -456,7 +463,8 @@ router.post(
 
                     const scanResult =
                         await scanFile(
-                            tempPath
+                            tempPath,
+                            { signal: scanAbortController.signal }
                         );
 
                     if (
@@ -715,7 +723,14 @@ router.post(
                     message === 'No files received.'
                         ? 'No files received.'
                         : 'The uploaded file was rejected by the security scanner.';
-            } else if (message.includes('Malware scanner failed.')) {
+            } else if (
+                error.code === 'SCAN_QUEUE_FULL' ||
+                error.code === 'SCAN_TIMEOUT' ||
+                error.code === 'CLAMAV_SPAWN_FAILED' ||
+                error.code === 'CLAMAV_SCAN_FAILED' ||
+                error.code === 'Malware scanner failed.' ||
+                message.includes('Malware scanner failed.')
+            ) {
                 statusCode = 503;
                 publicMessage =
                     'File security scanning is temporarily unavailable. Please try again later.';
@@ -745,6 +760,8 @@ router.post(
         try {
             response = await processUpload();
         } finally {
+            req.removeListener('aborted', abortScanForDisconnectedClient);
+            res.removeListener('close', abortScanForDisconnectedClient);
             // Multer writes plaintext files before this handler runs. Remove
             // only this request's files before sending its response. Cleanup
             // failures are logged by cleanupTempFile and do not mask errors.
@@ -753,6 +770,7 @@ router.post(
             }
         }
 
+        if (response.status === 503) res.set('Retry-After', '5');
         return res.status(response.status).json(response.body);
 
     }

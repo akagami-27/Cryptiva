@@ -137,6 +137,11 @@ installModuleMock('../services/fileValidationService', {
 installModuleMock('../services/malwareScanService', {
     async scanFile() {
         context.scanCalls += 1;
+        if (context.scenario.scanErrorCode) {
+            const error = new Error('Malware scanner failed.');
+            error.code = context.scenario.scanErrorCode;
+            throw error;
+        }
         if (context.scenario.scanFailureOn === context.scanCalls) {
             throw new Error('Malware scanner failed.');
         }
@@ -240,6 +245,14 @@ test('scanner failure removes its temporary upload', async () => {
     const response = await withUploadAndCleanupAssertion(['scanner-error.txt']);
     assert.equal(response.status, 503);
     assert.match(response.body.error, /scanning is temporarily unavailable/);
+});
+
+test('scanner queue saturation returns a retryable response and removes the temporary upload', async () => {
+    resetScenario({ scanErrorCode: 'SCAN_QUEUE_FULL' });
+    const response = await withUploadAndCleanupAssertion(['busy-scanner.txt']);
+    assert.equal(response.status, 503);
+    assert.equal(response.headers['retry-after'], '5');
+    assert.match(response.body.error, /scanning is temporarily unavailable/i);
 });
 
 test('encryption and unexpected metadata failures remove their temporary uploads', async () => {
