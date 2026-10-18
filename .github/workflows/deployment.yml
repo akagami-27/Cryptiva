@@ -141,12 +141,57 @@ jobs:
           kubectl apply -k k8s/overlays/production --validate=false
 
       - name: Monitor Kubernetes Rollout
+        id: rollout
         run: |
           kubectl rollout status deployment/cryptiva \
             --namespace=cryptiva \
             --timeout=180s
 
           echo "Kubernetes rollout completed successfully."
+
+      - name: Diagnose Failed Kubernetes Rollout
+        if: ${{ failure() && steps.rollout.outcome == 'failure' }}
+        continue-on-error: true
+        run: |
+          set +e
+
+          echo "::group::Rollout failure diagnostics (allowlisted fields only)"
+
+          echo "Deployment status and rollout conditions"
+          kubectl get deployment cryptiva --namespace=cryptiva -o json | jq -r '
+            "name=\(.metadata.name) generation=\(.metadata.generation) observedGeneration=\(.status.observedGeneration // 0) desired=\(.spec.replicas // 0) current=\(.status.replicas // 0) updated=\(.status.updatedReplicas // 0) ready=\(.status.readyReplicas // 0) available=\(.status.availableReplicas // 0) unavailable=\(.status.unavailableReplicas // 0)",
+            (.status.conditions[]? | "condition=\(.type) status=\(.status) reason=\(.reason // "")")
+          '
+
+          echo "ReplicaSets (name, owner, desired/current/ready)"
+          kubectl get replicasets --namespace=cryptiva \
+            --selector=app.kubernetes.io/name=cryptiva -o json | jq -r '
+            .items[]? |
+            "name=\(.metadata.name) owner=\([.metadata.ownerReferences[]? | select(.kind == "Deployment") | .name] | join(",")) desired=\(.spec.replicas // 0) current=\(.status.replicas // 0) ready=\(.status.readyReplicas // 0)"
+          '
+
+          echo "Pods (readiness, restarts, last termination, deletion and node)"
+          kubectl get pods --namespace=cryptiva \
+            --selector=app.kubernetes.io/name=cryptiva -o json | jq -r '
+            .items[]? |
+            "pod=\(.metadata.name) phase=\(.status.phase // "Unknown") ready=\([.status.conditions[]? | select(.type == "Ready") | .status] | join(",")) deleting=\(.metadata.deletionTimestamp // "no") node=\(.spec.nodeName // "unassigned") containers=\([.status.containerStatuses[]? | "\(.name):ready=\(.ready),restarts=\(.restartCount),lastReason=\(.lastState.terminated.reason // ""),lastExit=\(.lastState.terminated.exitCode // ""),waiting=\(.state.waiting.reason // ""),terminated=\(.state.terminated.reason // ""),stateExit=\(.state.terminated.exitCode // "")"] | join(";"))"
+          '
+
+          echo "Pod termination grace and probe/resource settings (no environment fields)"
+          kubectl get deployment cryptiva --namespace=cryptiva -o json | jq -r '
+            "strategy=\(.spec.strategy.type // "") maxSurge=\(.spec.strategy.rollingUpdate.maxSurge // "") maxUnavailable=\(.spec.strategy.rollingUpdate.maxUnavailable // "") terminationGracePeriodSeconds=\(.spec.template.spec.terminationGracePeriodSeconds // "")",
+            (.spec.template.spec.containers[]? | "container=\(.name) resources=\(.resources // {}) startupProbe=\(.startupProbe // {}) readinessProbe=\(.readinessProbe // {}) livenessProbe=\(.livenessProbe // {})")
+          '
+
+          echo "Recent namespace events (latest 30; messages intentionally omitted)"
+          kubectl get events --namespace=cryptiva --sort-by=.lastTimestamp -o json | jq -r '
+            [.items[]? | {time:(.lastTimestamp // .eventTime // .metadata.creationTimestamp // ""), type:(.type // ""), reason:(.reason // ""), object:(.involvedObject.kind + "/" + .involvedObject.name), count:(.count // 1)}] |
+            .[-30:][] |
+            "time=\(.time) type=\(.type) reason=\(.reason) object=\(.object) count=\(.count)"
+          '
+
+          echo "Previous container logs were omitted to avoid exposing arbitrary application output."
+          echo "::endgroup::"
 
       - name: Verify Production Health
         run: |
