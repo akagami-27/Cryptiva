@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import AuthFrame from '../components/AuthFrame.jsx';
+import PasswordField from '../components/PasswordField.jsx';
 import { refreshCsrfToken } from '../api/client.js';
 import { getPasswordConfirmationError } from '../utils/authFormValidation.js';
 
@@ -24,6 +25,7 @@ export default function Register() {
 
   async function submit(event) {
     event.preventDefault();
+    if (submitting) return;
     setFormError('');
     const mismatch = getPasswordConfirmationError(password, confirmPassword);
     if (mismatch) {
@@ -48,14 +50,14 @@ export default function Register() {
   return (
     <AuthFrame>
       <a className="brand" href="/" aria-label="Cryptiva home">
-        <span className="brand-mark">C</span>
+        <img className="brand-logo" src="/images/cryptiva-logo.png" alt="" />
         <span>cryptiva</span>
       </a>
 
       <p className="eyebrow">GET STARTED</p>
       <h1>Create your account</h1>
       <p className="auth-subtitle">
-        A safer place for your important files.
+        Create a secure account for your private files and sharing links.
       </p>
 
       <form action="/register" method="POST" className="auth-form" onSubmit={submit}>
@@ -70,28 +72,36 @@ export default function Register() {
           maxLength={20}
           pattern="[A-Za-z0-9_]+"
           required
+          placeholder="Choose a username"
+          autoCapitalize="none"
+          spellCheck="false"
+          aria-describedby="username-hint"
         />
+        <p className="auth-field-hint" id="username-hint">3–20 characters: letters, numbers, and underscores.</p>
 
         <label htmlFor="password">Password</label>
-        <input
+        <PasswordField
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           minLength={8}
+          maxLength={128}
           required
+          placeholder="Create a password"
           value={password}
           onChange={(event) => { setPassword(event.target.value); setFormError(''); }}
         />
+        <p className="auth-field-hint">Use 8–128 characters.</p>
 
         <label htmlFor="confirmPassword">Confirm password</label>
-        <input
+        <PasswordField
           id="confirmPassword"
           name="confirmPassword"
-          type="password"
           autoComplete="new-password"
           minLength={8}
+          maxLength={128}
           required
+          placeholder="Enter your password again"
           value={confirmPassword}
           onChange={(event) => { setConfirmPassword(event.target.value); setFormError(''); }}
           aria-invalid={Boolean(getPasswordConfirmationError(password, confirmPassword)) || undefined}
@@ -102,8 +112,8 @@ export default function Register() {
         </p>
 
         {formError && <p className="auth-error" role="alert">{formError}</p>}
-        <button type="submit" className="primary-button" disabled={submitting}>
-          Create account <span aria-hidden="true">→</span>
+        <button type="submit" className="primary-button" disabled={submitting} aria-busy={submitting}>
+          {submitting ? <><span className="auth-spinner" aria-hidden="true" /> Creating account…</> : <>Create account <span aria-hidden="true">→</span></>}
         </button>
       </form>
 
