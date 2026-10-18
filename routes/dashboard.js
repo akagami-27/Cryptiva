@@ -1,7 +1,6 @@
 'use strict';
 
 const express = require('express');
-const path = require('path');
 const crypto = require('crypto');
 
 const router = express.Router();
@@ -11,30 +10,6 @@ const { requireAuth } = require('../middleware/auth');
 const File = require('../models/file');
 const ShareLink = require('../models/shareLink');
 const { createShareUrl } = require('../services/shareUrlService');
-
-
-/*
-|--------------------------------------------------------------------------
-| Dashboard Page
-|--------------------------------------------------------------------------
-*/
-
-router.get(
-    '/',
-    requireAuth,
-    (req, res) => {
-
-        return res.sendFile(
-            path.join(
-                __dirname,
-                '..',
-                'views',
-                'dashboard.html'
-            )
-        );
-
-    }
-);
 
 
 /*
