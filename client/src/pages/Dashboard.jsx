@@ -11,6 +11,7 @@ const API = {
   files: "/files/data",
   upload: "/files/upload",
 };
+const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
 function getCsrfToken() {
   return (
@@ -98,6 +99,9 @@ export default function Dashboard() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState("idle");
+  const [uploadFilePosition, setUploadFilePosition] = useState({ current: 0, total: 0 });
+  const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0);
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
   const [shareFile, setShareFile] = useState(null);
@@ -110,6 +114,7 @@ export default function Dashboard() {
 
   const fileInputRef = useRef(null);
   const toastTimer = useRef(null);
+  const uploadInProgressRef = useRef(false);
 
   const notify = useCallback((message, type = "success") => {
     setToast({ message, type });
@@ -158,24 +163,22 @@ export default function Dashboard() {
     );
   }, [files, search]);
 
-  const totalSize = files.reduce(
-    (sum, file) => sum + (Number(file.size) || 0),
-    0
-  );
-
-  // `/files/data` exposes this server-derived flag for each file.
-  const sharedCount = files.filter((file) => file.hasActiveShare).length;
-
   async function handleUpload(selectedFiles) {
-    if (!selectedFiles?.length) return;
+    if (!selectedFiles?.length || uploadInProgressRef.current) return;
 
+    uploadInProgressRef.current = true;
     let uploadedCount = 0;
     setUploading(true);
+    setUploadStage("uploading");
     setUploadProgress(0);
+    setUploadFilePosition({ current: 1, total: selectedFiles.length });
     setError("");
 
     try {
-      for (const file of selectedFiles) {
+      for (const [index, file] of selectedFiles.entries()) {
+        setUploadStage("uploading");
+        setUploadProgress(0);
+        setUploadFilePosition({ current: index + 1, total: selectedFiles.length });
         const formData = new FormData();
         formData.append("files", file);
 
@@ -185,6 +188,7 @@ export default function Dashboard() {
           const xhr = new XMLHttpRequest();
 
           xhr.open("POST", API.upload);
+          xhr.timeout = UPLOAD_TIMEOUT_MS;
           xhr.withCredentials = true;
           xhr.setRequestHeader("Accept", "application/json");
 
@@ -192,7 +196,9 @@ export default function Dashboard() {
 
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
-              setUploadProgress(Math.round((event.loaded / event.total) * 100));
+              const progress = Math.min(100, Math.round((event.loaded / event.total) * 100));
+              setUploadProgress(progress);
+              if (progress >= 100) setUploadStage("processing");
             }
           };
 
@@ -214,20 +220,25 @@ export default function Dashboard() {
 
           xhr.onerror = () => reject(new Error("Network error during upload."));
           xhr.onabort = () => reject(new Error("Upload cancelled."));
+          xhr.ontimeout = () => reject(new Error("The upload timed out before the server confirmed it. Please retry."));
           xhr.send(formData);
         });
         uploadedCount += 1;
       }
 
-      notify("Upload completed successfully.");
+      setUploadStage("success");
+      setAnalyticsRefreshKey((value) => value + 1);
       await loadData();
     } catch (err) {
+      setUploadStage("error");
       const uploadError = err.message || "Upload could not be completed.";
+      if (uploadedCount > 0) setAnalyticsRefreshKey((value) => value + 1);
       await loadData();
       setError(uploadedCount > 0
         ? `${uploadedCount} file${uploadedCount === 1 ? " was" : "s were"} uploaded before the batch stopped. ${uploadError}`
         : uploadError);
     } finally {
+      uploadInProgressRef.current = false;
       setUploading(false);
       setUploadProgress(0);
 
@@ -385,6 +396,10 @@ export default function Dashboard() {
       onDrop={handlePageDrop}
     >
       <AppShell username={username} className="dashboard-app-shell" contentClassName="dashboard-main">
+          <Suspense fallback={<section className="file-analytics" aria-labelledby="file-analytics-title" aria-busy="true"><h2 id="file-analytics-title">File Analytics</h2><p role="status">Loading analytics…</p></section>}>
+            <FileAnalyticsSection refreshKey={analyticsRefreshKey} />
+          </Suspense>
+
           <section className="dashboard-hero">
             <div>
               <div className="hero-badge">
@@ -410,28 +425,8 @@ export default function Dashboard() {
               disabled={uploading}
             >
               <span className="upload-button-icon" aria-hidden="true">＋</span>
-              {uploading ? "Uploading…" : "Upload files"}
+              {uploading ? (["success", "error"].includes(uploadStage) ? "Refreshing…" : "Uploading…") : "Upload files"}
             </button>
-          </section>
-
-          <section className="dashboard-stats">
-            <article className="stat-card">
-              <div className="stat-heading"><span className="stat-symbol stat-symbol--violet">▤</span><span>Total files</span></div>
-              <strong className="accent">{loadFailed && files.length === 0 ? "—" : files.length}</strong>
-              <small>Stored in your vault</small>
-            </article>
-
-            <article className="stat-card">
-              <div className="stat-heading"><span className="stat-symbol stat-symbol--cyan">◫</span><span>Storage used</span></div>
-              <strong>{loadFailed && files.length === 0 ? "—" : formatBytes(totalSize)}</strong>
-              <small>Across all uploaded files</small>
-            </article>
-
-            <article className="stat-card">
-              <div className="stat-heading"><span className="stat-symbol stat-symbol--green">↗</span><span>Shared files</span></div>
-              <strong className="success">{loadFailed && files.length === 0 ? "—" : sharedCount}</strong>
-              <small>With controlled access</small>
-            </article>
           </section>
 
           <input
@@ -462,13 +457,40 @@ export default function Dashboard() {
               <span className="upload-spark upload-spark--one">✦</span>
               <span className="upload-spark upload-spark--two">✧</span>
             </div>
-            <h3>{uploading ? "Securing your files…" : dragActive ? "Release to add to your vault" : "Drop files into your secure vault"}</h3>
-            <p>{uploading ? "Your upload is in progress. Keep this page open." : "Drag and drop anywhere on this page, or browse your device"}</p>
-            <div className="upload-meta"><span>↳ Multiple files supported</span><span>Up to 50 MB per file</span><span>Encrypted storage</span></div>
-            {uploading && (
-              <div className="upload-progress">
-                <div className="progress-copy"><span>Uploading files</span><strong>{uploadProgress}%</strong></div>
-                <div className="progress-track"><div style={{ width: `${uploadProgress}%` }} /></div>
+            <h3>{uploading
+              ? uploadStage === "processing"
+                ? "Scanning and securing your files…"
+                : "Uploading your files…"
+              : uploadStage === "success"
+                ? "Files secured successfully."
+                : uploadStage === "error"
+                  ? "Upload could not be completed."
+                  : dragActive
+                    ? "Release to add to your vault"
+                    : "Drop files into your secure vault"}</h3>
+            <p aria-live="polite">{uploading
+              ? uploadStage === "processing"
+                ? `Transfer complete. Cryptiva is processing your files before they are made available. Keep this page open. (${uploadFilePosition.current} of ${uploadFilePosition.total})`
+                : `Transferring file ${uploadFilePosition.current} of ${uploadFilePosition.total}. Keep this page open.`
+              : uploadStage === "success"
+                ? "Upload complete. Refreshing your file list and analytics."
+                : uploadStage === "error"
+                  ? "Review the message below, then retry when ready."
+                  : "Drag and drop anywhere on this page, or browse your device"}</p>
+            <div className="upload-meta"><span>Multiple files supported</span><span>Up to 50 MB per file</span><span>Encrypted storage</span></div>
+            {uploading && ["uploading", "processing"].includes(uploadStage) && (
+              <div className={`upload-progress${uploadStage === "processing" ? " is-indeterminate" : ""}`}>
+                {uploadStage === "processing" ? (
+                  <>
+                    <div className="progress-copy"><span>Server security checks and secure storage</span><strong>In progress</strong></div>
+                    <div className="progress-track" role="progressbar" aria-label="Server security checks and secure storage in progress"><div /></div>
+                  </>
+                ) : (
+                  <>
+                    <div className="progress-copy"><span>Uploading file {uploadFilePosition.current} of {uploadFilePosition.total}</span><strong>{uploadProgress}%</strong></div>
+                    <div className="progress-track" role="progressbar" aria-label="File upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadProgress}><div style={{ width: `${uploadProgress}%` }} /></div>
+                  </>
+                )}
               </div>
             )}
           </section>
@@ -595,9 +617,6 @@ export default function Dashboard() {
               </div>
             )}
           </section>
-          <Suspense fallback={<section className="file-analytics" aria-labelledby="file-analytics-title" aria-busy="true"><h2 id="file-analytics-title">File Analytics</h2><p role="status">Loading analytics…</p></section>}>
-            <FileAnalyticsSection />
-          </Suspense>
       {dragActive && (
         <div className="drag-cursor-layer" aria-hidden="true">
           <div className="drag-cursor-core" style={{ left: dragPosition.x, top: dragPosition.y }}>

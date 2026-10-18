@@ -181,7 +181,7 @@ function RecentActivity({ events }) {
   );
 }
 
-export default function FileAnalyticsSection() {
+export default function FileAnalyticsSection({ refreshKey = 0 }) {
   const [range, setRange] = useState("30d");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -203,7 +203,7 @@ export default function FileAnalyticsSection() {
       .catch((requestError) => { if (active) setError(requestError.message || "Analytics are temporarily unavailable."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [range, retry]);
+  }, [range, retry, refreshKey]);
 
   return (
     <section className="file-analytics" aria-labelledby="file-analytics-title" aria-busy={loading}>
