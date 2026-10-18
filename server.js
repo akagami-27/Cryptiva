@@ -25,6 +25,7 @@ const { hydrateJwtIdentity } = require('./middleware/auth');
 
 const {
     ensureCsrfToken,
+    sendCsrfToken,
     requireCsrf
 } = require('./middleware/csrf');
 
@@ -319,15 +320,7 @@ app.use(
 | cannot be populated by Express. Return the current session token instead.
 */
 
-app.get('/csrf-token', (req, res) => {
-    if (!req.session?.csrfToken) {
-        return res.status(500).json({ error: 'Unable to initialize CSRF token.' });
-    }
-
-    return res
-        .set('Cache-Control', 'no-store')
-        .json({ csrfToken: req.session.csrfToken });
-});
+app.get('/csrf-token', sendCsrfToken);
 
 
 /*

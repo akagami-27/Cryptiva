@@ -39,6 +39,16 @@ function ensureCsrfToken(req, res, next) {
     next();
 }
 
+function sendCsrfToken(req, res) {
+    if (!req.session?.csrfToken) {
+        return res.status(500).json({ error: 'Unable to initialize CSRF token.' });
+    }
+
+    return res
+        .set('Cache-Control', 'no-store')
+        .json({ csrfToken: req.session.csrfToken });
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -285,5 +295,6 @@ function csrfError(
 
 module.exports = {
     ensureCsrfToken,
+    sendCsrfToken,
     requireCsrf
 };
