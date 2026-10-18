@@ -693,6 +693,11 @@ app.use(
     require('./routes/search')
 );
 
+app.use(
+    '/analytics',
+    require('./routes/analytics')
+);
+
 
 /*
 |--------------------------------------------------------------------------

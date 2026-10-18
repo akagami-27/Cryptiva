@@ -8,7 +8,7 @@ const reactPagePaths = new Set([
 const backendPathPrefixes = [
   '/api/', '/health/', '/files/', '/shared/', '/activity/', '/profile/',
   '/security/', '/dashboard/', '/search/', '/me', '/csrf-token', '/login',
-  '/register', '/logout'
+  '/register', '/logout', '/analytics/'
 ];
 
 function reactRouteStatusPlugin() {
@@ -62,6 +62,7 @@ export default defineConfig({
       '/profile': backendProxy,
       '/activity': backendProxy,
       '/search': backendProxy,
+      '/analytics': backendProxy,
       '/me': backendProxy,
       '/csrf-token': backendProxy,
       '/health': backendProxy,
