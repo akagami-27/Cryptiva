@@ -1,11 +1,12 @@
 name: Build and Deploy to Harbor (Production)
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
-    tags:
-      - "v*.*.*"
 
 permissions:
   contents: read
@@ -44,6 +45,7 @@ jobs:
   # ============================================================================
   build-and-push:
     name: Build & Push to Harbor
+    if: github.event_name == 'push'
     needs: validate
     runs-on: ubuntu-latest
     environment: production
@@ -90,6 +92,7 @@ jobs:
   # ============================================================================
   deploy:
     name: Deploy to Kubernetes
+    if: github.event_name == 'push'
     needs: build-and-push
     runs-on: ubuntu-latest
     environment: production
