@@ -396,10 +396,7 @@ export default function Dashboard() {
       onDrop={handlePageDrop}
     >
       <AppShell username={username} className="dashboard-app-shell" contentClassName="dashboard-main">
-          <Suspense fallback={<section className="file-analytics" aria-labelledby="file-analytics-title" aria-busy="true"><h2 id="file-analytics-title">File Analytics</h2><p role="status">Loading analytics…</p></section>}>
-            <FileAnalyticsSection refreshKey={analyticsRefreshKey} />
-          </Suspense>
-
+          <section className={`dashboard-workspace-panel${dragActive ? " drag-active" : ""}`} aria-label="Your private workspace and file upload">
           <section className="dashboard-hero">
             <div>
               <div className="hero-badge">
@@ -504,6 +501,11 @@ export default function Dashboard() {
               )}
             </div>
           )}
+          </section>
+
+          <Suspense fallback={<section className="file-analytics" aria-labelledby="file-analytics-title" aria-busy="true"><h2 id="file-analytics-title">File Analytics</h2><p role="status">Loading analytics…</p></section>}>
+            <FileAnalyticsSection refreshKey={analyticsRefreshKey} />
+          </Suspense>
 
           <section className="file-section">
             <div className="file-section-header">
