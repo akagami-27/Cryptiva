@@ -5,24 +5,14 @@ on:
     branches:
       - main
     tags:
-      - 'v*.*.*'
-  workflow_dispatch:
-    inputs:
-      target_env:
-        description: 'Deployment Environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
+      - "v*.*.*"
 
 permissions:
   contents: read
 
 jobs:
   # ============================================================================
-  # 1. CI Stage: Validate Backend Tests and Frontend Build with Node.js 22
+  # 1. CI Stage: Validate Backend Tests and Frontend Build
   # ============================================================================
   validate:
     name: Test & Build Validation
@@ -36,7 +26,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: npm
 
       - name: Install Dependencies
         run: |
@@ -50,13 +40,14 @@ jobs:
         run: npm run client:build
 
   # ============================================================================
-  # 2. CD Stage: Build & Push Docker Image to Harbor Registry
+  # 2. CD Stage: Build & Push Docker Image to Harbor
   # ============================================================================
   build-and-push:
     name: Build & Push to Harbor
     needs: validate
     runs-on: ubuntu-latest
     environment: production
+
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
 
@@ -67,7 +58,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Supports values from either Variables or Secrets
       - name: Log in to Harbor Registry
         uses: docker/login-action@v3
         with:
@@ -75,15 +65,14 @@ jobs:
           username: ${{ vars.HARBOR_USERNAME || secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Extract Docker Metadata (Tags & Labels)
+      - name: Extract Docker Metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ vars.HARBOR_HOST || secrets.HARBOR_HOST }}/${{ vars.HARBOR_PROJECT || secrets.HARBOR_PROJECT }}/cryptiva
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,format=short
-            type=semver,pattern={{version}}
+            type=sha,format=long,priority=1000
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }},priority=100
 
       - name: Build and Push Docker Image to Harbor
         uses: docker/build-push-action@v5
@@ -97,7 +86,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 3. Deploy Stage: Apply Kubernetes Manifests & Verify Rollout in 'cryptiva' Namespace
+  # 3. CD Stage: Deploy to Production Kubernetes
   # ============================================================================
   deploy:
     name: Deploy to Kubernetes
@@ -109,57 +98,91 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Set up Kustomize to dynamically update image tags
       - name: Set up Kustomize
         uses: imranismail/setup-kustomize@v3
 
-      # Write Kubeconfig directly from env
-      - name: Configure Kubeconfig & Diagnose Connection
+      - name: Configure Kubeconfig
         env:
           KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
         run: |
-          mkdir -p ~/.kube
-          echo "$KUBECONFIG_DATA" > ~/.kube/config
-          chmod 600 ~/.kube/config
+          set -eu
 
-          SERVER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-          TOKEN=$(kubectl config view --minify --raw -o jsonpath='{.users[0].user.token}')
-          echo "Connecting to Server: $SERVER_URL"
-
-          echo "--- DIAGNOSTIC: Checking response from Kubernetes endpoint ---"
-          curl -k -i -s -H "Authorization: Bearer $TOKEN" "$SERVER_URL/api" | head -n 35 || true
-          echo "--- END DIAGNOSTIC ---"
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBECONFIG_DATA" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
 
           kubectl get nodes
 
-      # Ensure target namespace 'cryptiva' exists
       - name: Ensure Namespace Exists
         run: |
-          kubectl create namespace cryptiva --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace cryptiva \
+            --dry-run=client -o yaml | kubectl apply -f -
 
-      # Update Kustomize production overlay with the built Harbor image and tag
       - name: Update Kustomize Image Tag
+        env:
+          HARBOR_HOST: ${{ vars.HARBOR_HOST || secrets.HARBOR_HOST }}
+          HARBOR_PROJECT: ${{ vars.HARBOR_PROJECT || secrets.HARBOR_PROJECT }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
         run: |
-          cd k8s/overlays/production
-          IMAGE_PATH="${{ vars.HARBOR_HOST || secrets.HARBOR_HOST }}/${{ vars.HARBOR_PROJECT || secrets.HARBOR_PROJECT }}/cryptiva"
-          IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
-          kustomize edit set image cryptiva="${IMAGE_PATH}:${IMAGE_TAG}"
+          set -eu
 
-      # Apply Kustomize production overlay to the 'cryptiva' namespace
+          IMAGE_PATH="${HARBOR_HOST}/${HARBOR_PROJECT}/cryptiva"
+
+          cd k8s/overlays/production
+          kustomize edit set image "cryptiva=${IMAGE_PATH}:${IMAGE_TAG}"
+
+          echo "Prepared production image tag: ${IMAGE_TAG}"
+
       - name: Apply Kustomize Manifests
         run: |
           kubectl apply -k k8s/overlays/production --validate=false
 
-      # Force Kubernetes to pull the new image from Harbor and perform a rolling restart
-      - name: Trigger Rolling Restart
+      - name: Monitor Kubernetes Rollout
         run: |
-          echo "Triggering rolling update to pull fresh image from Harbor..."
-          kubectl rollout restart deployment/cryptiva --namespace=cryptiva
+          kubectl rollout status deployment/cryptiva \
+            --namespace=cryptiva \
+            --timeout=180s
 
-      # Monitor rolling update in the 'cryptiva' namespace
-      - name: Monitor Kubernetes Rollout Status
+          echo "Kubernetes rollout completed successfully."
+
+      - name: Verify Production Health
         run: |
-          echo "Watching deployment rollout in 'cryptiva' namespace..."
-          kubectl rollout status deployment/cryptiva --namespace=cryptiva --timeout=180s
-          echo "Deployment rollout in 'cryptiva' namespace completed successfully!"
+          set -eu
 
+          for endpoint in \
+            "https://cryptiva.smolelab.com/health/live" \
+            "https://cryptiva.smolelab.com/health/ready"
+          do
+            echo "Checking ${endpoint}"
+            success=false
+
+            for attempt in $(seq 1 12); do
+              if curl --fail --silent --show-error \
+                --max-time 10 "$endpoint"; then
+                echo
+                success=true
+                break
+              fi
+
+              if [ "$attempt" -lt 12 ]; then
+                sleep 5
+              fi
+            done
+
+            if [ "$success" != true ]; then
+              echo "Health check failed: ${endpoint}"
+              exit 1
+            fi
+          done
+
+          echo "Production health checks passed."
+
+      - name: Report Deployment Details
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          echo "Deployment completed successfully."
+          echo "Commit: ${COMMIT_SHA}"
+          echo "Image tag: ${IMAGE_TAG}"
+          echo "Environment: production"
