@@ -744,5 +744,5 @@ function Security() {
     </PageFrame>
   );
 }
-export default function WorkspacePage({ section }) { return ({ shared: <SharedFiles/>, activity: <Activity/>, profile: <Profile/>, security: <Security/> })[section] || <PageFrame title="Workspace"><p>Page unavailable.</p><Link to="/react/dashboard">Dashboard</Link></PageFrame>; }
+export default function WorkspacePage({ section }) { return ({ shared: <SharedFiles/>, activity: <Activity/>, profile: <Profile/>, security: <Security/> })[section] || <PageFrame title="Workspace"><p>Page unavailable.</p><Link to="/dashboard">Dashboard</Link></PageFrame>; }
 

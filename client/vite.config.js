@@ -15,7 +15,8 @@ export default defineConfig({
       '/login': backendProxy,
       '/register': backendProxy,
       '/logout': backendProxy,
-      '/dashboard': backendProxy,
+      // Keep React page navigation and refreshes in Vite. Proxy dashboard APIs only.
+      '/dashboard/data': backendProxy,
       '/files': backendProxy,
       '/shared': backendProxy,
       '/security': backendProxy,
