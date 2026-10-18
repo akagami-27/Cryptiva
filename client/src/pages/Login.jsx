@@ -32,8 +32,10 @@ export default function Login() {
       setCsrfToken(token);
       const response = await fetch('/login', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, credentials: 'same-origin', redirect: 'follow' });
       const destination = new URL(response.url, window.location.origin);
-      if (response.redirected && destination.pathname === '/dashboard') { window.location.assign(destination.pathname + destination.search); return; }
-      if (response.redirected && destination.pathname.startsWith('/files/shared/')) { window.location.assign(destination.pathname); return; }
+      if (response.redirected && destination.origin === window.location.origin && destination.pathname !== '/login') {
+        window.location.assign(destination.pathname + destination.search + destination.hash);
+        return;
+      }
       setFormError('Unable to sign in with those details. Please check your username and password.');
     } catch { setFormError('Unable to reach the sign-in service. Please try again.'); }
     finally { setSubmitting(false); }

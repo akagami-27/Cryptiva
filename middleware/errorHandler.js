@@ -46,6 +46,12 @@ function errorHandler(err, req, res, next) {
 }
 
 function notFoundHandler(req, res) {
+    if (
+        req.path?.startsWith('/api/') ||
+        req.get?.('Accept')?.includes('application/json')
+    ) {
+        return res.status(404).json({ error: 'Not found.' });
+    }
     return sendErrorPage(res, 404);
 }
 
