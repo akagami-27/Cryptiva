@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "../components/AppShell";
 import FileIntegrityDisclosure from "../components/FileIntegrityDisclosure";
 import { parseShareLimit } from "../utils/shareLimit";
 import "../styles/dashboard.css";
+
+const FileAnalyticsSection = lazy(() => import("../components/analytics/FileAnalyticsSection.jsx"));
 
 const API = {
   me: "/me",
@@ -593,6 +595,9 @@ export default function Dashboard() {
               </div>
             )}
           </section>
+          <Suspense fallback={<section className="file-analytics" aria-labelledby="file-analytics-title" aria-busy="true"><h2 id="file-analytics-title">File Analytics</h2><p role="status">Loading analytics…</p></section>}>
+            <FileAnalyticsSection />
+          </Suspense>
       {dragActive && (
         <div className="drag-cursor-layer" aria-hidden="true">
           <div className="drag-cursor-core" style={{ left: dragPosition.x, top: dragPosition.y }}>
