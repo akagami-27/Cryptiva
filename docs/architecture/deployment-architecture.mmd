@@ -1,0 +1,50 @@
+flowchart TD
+  github["GitHub repository"]
+  pr["Pull request to main"]
+  push["Push to main"]
+
+  subgraph validate["GitHub Actions: validate job (PR and push)"]
+    checkout1["Checkout source"]
+    node["Set up Node.js 22"]
+    install["npm ci; npm ci --prefix client"]
+    test["npm test"]
+    build["npm run client:build"]
+    checkout1 --> node --> install --> test --> build
+  end
+
+  subgraph buildPublish["GitHub Actions: build-and-push (push only, after validation)"]
+    checkout2["Checkout source"]
+    buildx["Set up Docker Buildx"]
+    context["Docker context: repository root<br/>filtered by .dockerignore"]
+    image["Build multi-stage Docker image<br/>Dockerfile"]
+    cache["GitHub Actions build cache<br/>cache-to mode=max"]
+    harbor["Harbor container registry<br/>SHA tag and latest on main"]
+    checkout2 --> buildx --> context --> image --> harbor
+    image --> cache
+  end
+
+  subgraph deploy["GitHub Actions: deploy (push only, after image publish)"]
+    kubeconfig["Kubeconfig from Actions secret"]
+    vars["Registry/project values from Actions variables or secrets"]
+    tag["Set image in production Kustomize overlay"]
+    apply["kubectl apply -k"]
+    rollout["Wait for Kubernetes rollout"]
+    health["Check /health/live and /health/ready"]
+    kubeconfig --> apply
+    vars --> tag
+    tag --> apply --> rollout --> health
+  end
+
+  cluster["Kubernetes resources declared in k8s/<br/>live cluster state unverified"]
+  github --> pr --> validate
+  github --> push --> validate
+  push --> buildPublish
+  validate -->|"required job dependency"| buildPublish
+  buildPublish -->|"published image tag output"| deploy
+  harbor -->|"image referenced by updated overlay"| cluster
+  deploy --> cluster
+
+  missing["No SAST, dependency-audit, or container-image scan job is configured"]
+  missing -.-> validate
+  blocker["Verification gap:<br/>the workflow has no pre-publish<br/>server-start smoke test"]
+  blocker -.-> image

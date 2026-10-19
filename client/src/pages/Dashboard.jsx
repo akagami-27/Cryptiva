@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import AppShell from "../components/AppShell";
 import FileIntegrityDisclosure from "../components/FileIntegrityDisclosure";
 import { parseShareLimit } from "../utils/shareLimit";
+import { ensureCsrfToken } from "../api/client.js";
 import "../styles/dashboard.css";
 
 const FileAnalyticsSection = lazy(() => import("../components/analytics/FileAnalyticsSection.jsx"));
@@ -13,14 +14,6 @@ const API = {
 };
 const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
-function getCsrfToken() {
-  return (
-    document.querySelector('meta[name="csrf-token"]')?.content ||
-    document.querySelector('input[name="_csrf"]')?.value ||
-    ""
-  );
-}
-
 async function apiRequest(url, options = {}) {
   const headers = new Headers(options.headers || {});
   const method = (options.method || "GET").toUpperCase();
@@ -28,8 +21,7 @@ async function apiRequest(url, options = {}) {
   headers.set("Accept", "application/json");
 
   if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
-    const token = getCsrfToken();
-    if (token) headers.set("X-CSRF-Token", token);
+    headers.set("X-CSRF-Token", await ensureCsrfToken());
   }
 
   const response = await fetch(url, {
@@ -182,7 +174,7 @@ export default function Dashboard() {
         const formData = new FormData();
         formData.append("files", file);
 
-        const token = getCsrfToken();
+        const token = await ensureCsrfToken();
 
         await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
@@ -192,7 +184,7 @@ export default function Dashboard() {
           xhr.withCredentials = true;
           xhr.setRequestHeader("Accept", "application/json");
 
-          if (token) xhr.setRequestHeader("X-CSRF-Token", token);
+          xhr.setRequestHeader("X-CSRF-Token", token);
 
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
