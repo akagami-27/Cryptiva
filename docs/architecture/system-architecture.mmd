@@ -1,0 +1,47 @@
+flowchart LR
+  browser["User browser<br/>React application"]
+
+  subgraph local["Local development"]
+    vite["Vite dev server<br/>127.0.0.1:5173"]
+    backendDev["Node.js / Express<br/>configured PORT; commonly 3100 locally"]
+  end
+
+  subgraph production["Kubernetes deployment as declared in manifests"]
+    ingress["Ingress resource<br/>TLS host and certificate secret configured<br/>cluster state unverified"]
+    service["ClusterIP Service<br/>port 80 to pod port 3000"]
+    pod["Cryptiva application container<br/>Express API and built React files"]
+    temp["/app/tmp<br/>plaintext upload staging<br/>size-limited emptyDir"]
+    scanner["ClamAV process<br/>runs in application container"]
+    crypto["Crypto service<br/>AES-256-GCM, wrapped DEKs,<br/>SHA-256 verification"]
+    share["Share-flow controls<br/>token/password checks, expiry,<br/>download limits and reservations"]
+  end
+
+  subgraph services["Configured data services; hosting and live connectivity unverified"]
+    mongo["MongoDB<br/>users, file/share metadata,<br/>sessions, rate-limit buckets, audit logs"]
+    storage["Supabase Storage<br/>encrypted file objects"]
+  end
+
+  browser -->|"local page/assets"| vite
+  vite -->|"proxied API paths; target configured as 127.0.0.1:3100"| backendDev
+  browser -->|"production HTTPS as declared"| ingress
+  ingress -->|"HTTP service port 80"| service
+  service -->|"container port 3000"| pod
+  pod -->|"Mongoose connection configured by MONGODB_URI"| mongo
+  pod -->|"upload/download object operations"| storage
+  pod -->|"Multer writes uploaded plaintext"| temp
+  temp -->|"scan before encryption"| scanner
+  scanner -->|"clean-file result or fail-closed error"| pod
+  pod -->|"hash plaintext; encrypt with DEK; wrap DEK with master key"| crypto
+  crypto -->|"ciphertext only"| storage
+  storage -->|"ciphertext retrieved by API"| crypto
+  crypto -->|"decrypt and verify before release"| pod
+  pod -->|"authorized plaintext response"| browser
+  pod -->|"authenticated API, CSRF and ownership checks"| mongo
+  pod -->|"share state, password verification and atomic download reservations"| share
+  share -->|"token hashes, wrapped token, password hash, limits"| mongo
+  pod -->|"audit events; persistence is best effort in some paths"| mongo
+  browser -->|"JWT cookie and session cookie accompany requests"| pod
+
+  startupNote["Verification gap:<br/>the workflow has no pre-publish<br/>server-start smoke test"]
+  startupNote -.-> pod
+

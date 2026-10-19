@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const backendTarget = process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:3000';
+const backendTarget = process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:3100';
 const reactPagePaths = new Set([
   '/', '/login', '/register', '/dashboard', '/files', '/shared', '/activity', '/profile', '/security'
 ]);

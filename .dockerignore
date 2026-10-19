@@ -12,4 +12,5 @@ client/dist
 .sharing-deployment-backup-*
 tmp
 temp
+encrypted/
 *.log
